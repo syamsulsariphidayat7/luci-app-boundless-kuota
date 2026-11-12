@@ -252,7 +252,7 @@
 	<div class="foot">Angka dari vnStat di STB ini (tersimpan berkala, bisa telat s/d ±5 menit). Sisa kuota adalah perkiraan dari traffic yang lewat STB ini — bukan angka resmi operator.</div>
 
 	<div class="modal-bg" id="bkModalBg">
-		<div class="modal">
+		<div class="modal" id="bkModal">
 			<h3>Mulai Periode Baru</h3>
 			<div class="hint" id="bkModalIntro"></div>
 			<div class="banner show" id="bkModalSummary" style="display:block"></div>
@@ -322,6 +322,24 @@ function post(path, fields, cb){
 	var parts = ["token=" + encodeURIComponent(CSRF_TOKEN)];
 	for (var k in fields) parts.push(encodeURIComponent(k) + "=" + encodeURIComponent(fields[k]));
 	x.send(parts.join("&"));
+}
+// Latar modal mengikuti tema LuCI yang BENAR-BENAR tampil (bukan
+// skema OS): contoh latar elemen utama halaman; kalau transparan,
+// simpulkan dari luminansi warna teks halaman.
+function themeSurface(){
+	var sels = ["#maincontent", ".main", "body"];
+	for (var i = 0; i < sels.length; i++) {
+		var n = document.querySelector(sels[i]);
+		if (!n) continue;
+		var bg = getComputedStyle(n).backgroundColor;
+		if (bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)") return bg;
+	}
+	var m = (getComputedStyle(document.body).color || "").match(/\d+/g);
+	if (m && m.length >= 3) {
+		var lum = 0.299 * Number(m[0]) + 0.587 * Number(m[1]) + 0.114 * Number(m[2]);
+		return lum > 140 ? "#161f27" : "#ffffff";
+	}
+	return "#ffffff";
 }
 function schemeText(a){
 	if (!a) return "";
@@ -583,6 +601,7 @@ el("bkStartBtn").onclick = function(){
 	el("bkStartDate").value = state.today;
 	el("bkOpening").value = "0";
 	msg("bkStartMsg", "", true);
+	el("bkModal").style.background = themeSurface();
 	el("bkModalBg").className = "modal-bg open";
 };
 el("bkCancelStart").onclick = function(){ el("bkModalBg").className = "modal-bg"; };
