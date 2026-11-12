@@ -50,6 +50,10 @@
 .bk-wrap .cost-line{font-size:14px;text-align:right}
 .bk-wrap .cost-line .lbl{opacity:.65}
 .bk-wrap .cost-line b{display:block;font-size:19px}
+.bk-wrap .blok-line{font-size:14px}
+.bk-wrap .blok-line .lbl{opacity:.65}
+.bk-wrap .blok-line b{display:block;font-size:19px}
+.bk-wrap .blok-line .sub{display:block;font-size:12.5px;opacity:.75}
 .bk-wrap .bar{height:12px;border-radius:999px;background:rgba(127,127,127,.22);overflow:hidden;margin:12px 0 6px}
 .bk-wrap .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--cyan))}
 .bk-wrap .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
@@ -357,6 +361,9 @@ function render(){
 		var html = "";
 		html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">';
 		html += '<div class="big">' + gb(c.used_bytes, 1) + ' GB <small>terpakai dari ' + purchasedTxt + "</small></div>";
+		if (a.mode === "blok") {
+			html += '<div class="blok-line"><span class="lbl">Blok terbeli</span><b>' + c.blocks + " blok (" + gb(c.purchased_bytes, 0) + ' GB)</b><span class="sub">efektif ' + rp(c.eff_price_per_gb) + "/GB</span></div>";
+		}
 		html += '<div class="cost-line"><span class="lbl">Biaya sudah keluar</span><b>' + rp(c.paid) + "</b></div></div>";
 		if (c.purchased_bytes != null) html += '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
 		html += '<div class="hint" style="margin:0">Hari ke-' + c.day_number + " dari " + c.days_total + " · mulai " + fmtDate(a.start) + " · berakhir " + fmtDate(c.expiry) + " 00:00</div>";
@@ -366,9 +373,6 @@ function render(){
 		html += '<div><div class="k">Sisa</div><div class="v"' + remainCls + ">" + remainTxt + "</div></div>";
 		html += '<div><div class="k">Hari ini</div><div class="v">' + gb(c.today_bytes, 1) + " GB</div></div>";
 		html += "</div>";
-		if (a.mode === "blok") {
-			html += '<div class="hint" style="margin-top:10px">Blok terbeli: <b>' + c.blocks + " blok</b> (" + gb(c.purchased_bytes, 0) + " GB) · efektif " + rp(c.eff_price_per_gb) + "/GB</div>";
-		}
 		html += '<div class="lock-note">Skema periode ini dibekukan: ' + esc(schemeText(a)) + (a.iface === "br-lan" ? " · arah RX/TX dibalik" : "") + ". Perubahan di Pengaturan berlaku mulai periode berikutnya.</div>";
 		if (!c.complete) {
 			html += '<div class="lock-note amber">Data belum lengkap: vnStat untuk interface ini baru mencatat sesudah tanggal mulai periode (' + c.missing_days + " hari tidak tercatat), jadi total terpakai adalah batas bawah.</div>";
