@@ -405,7 +405,10 @@ function render(){
 		}
 		html += '<div class="cost-line"><span class="lbl">Biaya sudah keluar</span><b>' + rp(c.paid) + '</b><span class="sub">nilai terpakai ' + rp(c.used_value) + "</span></div></div>";
 		if (c.purchased_bytes != null) html += '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
-		html += '<div class="hint" style="margin:0">Hari ke-' + c.day_number + " dari " + c.days_total + " · mulai " + fmtDate(a.start) + " · berakhir " + fmtDate(c.expiry) + " 00:00</div>";
+		var left = c.days_total - c.day_number;
+		html += '<div class="hint" style="margin:0">Hari ke-' + c.day_number + " dari " + c.days_total
+			+ (left >= 0 ? " · sisa " + left + " hari" : " · lewat " + (-left) + " hari")
+			+ " · mulai " + fmtDate(a.start) + " · berakhir " + fmtDate(c.expiry) + " 00:00</div>";
 		html += '<div class="meta">';
 		html += '<div><div class="k">Download</div><div class="v">' + gb(c.dl_bytes, 1) + ' GB</div></div>';
 		html += '<div><div class="k">Upload</div><div class="v">' + gb(c.ul_bytes, 1) + ' GB</div></div>';
