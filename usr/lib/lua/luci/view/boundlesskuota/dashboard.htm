@@ -50,6 +50,7 @@
 .bk-wrap .cost-line{font-size:14px;text-align:right}
 .bk-wrap .cost-line .lbl{opacity:.65}
 .bk-wrap .cost-line b{display:block;font-size:19px}
+.bk-wrap .cost-line .sub{display:block;font-size:12.5px;opacity:.75}
 .bk-wrap .blok-line{font-size:14px}
 .bk-wrap .blok-line .lbl{opacity:.65}
 .bk-wrap .blok-line b{display:block;font-size:19px}
@@ -177,7 +178,7 @@
 
 		<div>
 			<div class="card">
-				<h2>Biaya &amp; Proyeksi</h2>
+				<h2>Proyeksi</h2>
 				<div id="bkCostBody"><div class="hint">Memuat...</div></div>
 			</div>
 
@@ -364,7 +365,7 @@ function render(){
 		if (a.mode === "blok") {
 			html += '<div class="blok-line"><span class="lbl">Blok terbeli</span><b>' + c.blocks + " blok (" + gb(c.purchased_bytes, 0) + ' GB)</b><span class="sub">efektif ' + rp(c.eff_price_per_gb) + "/GB</span></div>";
 		}
-		html += '<div class="cost-line"><span class="lbl">Biaya sudah keluar</span><b>' + rp(c.paid) + "</b></div></div>";
+		html += '<div class="cost-line"><span class="lbl">Biaya sudah keluar</span><b>' + rp(c.paid) + '</b><span class="sub">nilai terpakai ' + rp(c.used_value) + "</span></div></div>";
 		if (c.purchased_bytes != null) html += '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
 		html += '<div class="hint" style="margin:0">Hari ke-' + c.day_number + " dari " + c.days_total + " · mulai " + fmtDate(a.start) + " · berakhir " + fmtDate(c.expiry) + " 00:00</div>";
 		html += '<div class="meta">';
@@ -495,9 +496,6 @@ function renderCost(){
 	var a = state.active, c = a ? a.computed : null;
 	if (!a || !c) { body.innerHTML = '<div class="hint">Belum ada periode aktif.</div>'; return; }
 	var html = "";
-	html += '<div class="kv"><span class="k">Biaya sudah keluar</span><span class="v">' + rp(c.paid) + "</span></div>";
-	html += '<div class="kv"><span class="k">Nilai terpakai</span><span class="v">' + rp(c.used_value) + "</span></div>";
-	html += '<div class="kv"><span class="k">Harga efektif</span><span class="v">' + rp(c.eff_price_per_gb) + "/GB</span></div>";
 	if (a.mode === "blok" && c.projections) {
 		var p = c.projections;
 		html += '<div class="kv"><span class="k">Proyeksi akhir periode</span><span class="v">' + rp(p.low.paid) + " &ndash; " + rp(p.high.paid) + "</span></div>";
