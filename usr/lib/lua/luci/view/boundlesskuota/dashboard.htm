@@ -107,6 +107,7 @@
 <div class="bk-wrap" id="bkRoot">
 	<div class="bk-head">
 		<h1>&#128202; Monitoring Kuota</h1>
+		<button class="btn" id="bkStartBtn" type="button">Mulai Periode Baru</button>
 		<span class="sp"></span>
 		<span class="bk-upd" id="bkUpdated"></span>
 		<button class="btn alt sm" id="bkRefresh" type="button">Muat Ulang</button>
@@ -116,7 +117,7 @@
 
 	<div class="setup-card" id="bkSetupCard">
 		<h2>Aktifkan Monitoring Modem (wwan0)</h2>
-		<p>vnStat saat ini belum mencatat interface modem <b>wwan0</b>. Aktifkan supaya periode berikutnya bisa memakai data modem yang bersih. Periode berjalan tidak berubah.</p>
+		<p>vnStat belum mencatat <b>wwan0</b>. Aktifkan agar periode berikutnya memakai data modem; periode berjalan tidak berubah.</p>
 		<button class="btn" id="bkSetupBtn" type="button">Aktifkan Monitoring wwan0</button>
 	</div>
 
@@ -125,6 +126,11 @@
 			<div class="card">
 				<h2>Periode Berjalan</h2>
 				<div id="bkPeriodBody"><div class="hint">Memuat...</div></div>
+				<div id="bkUndoBox" style="display:none;margin-top:12px">
+					<div class="lock-note amber" style="margin-top:0">Periode baru saja dibuat. Tidak sengaja? Urungkan — periode sebelumnya aktif lagi, snapshot prematur dihapus.</div>
+					<button class="btn alt sm" id="bkUndoBtn" type="button" style="width:100%;margin-top:8px">Urungkan Periode Baru</button>
+				</div>
+				<div class="msg" id="bkPeriodMsg"></div>
 			</div>
 
 			<div class="card">
@@ -159,7 +165,7 @@
 					<tbody id="bkHistoryBody"></tbody>
 				</table>
 				</div>
-				<div class="hint">Periode tertutup disimpan sebagai snapshot permanen; tidak dihitung ulang dari vnStat.</div>
+				<div class="hint">Periode tertutup = snapshot permanen.</div>
 				<div class="corr">
 					<a class="btn alt sm" id="bkExportBtn" href="#">Ekspor Cadangan</a>
 					<button class="btn alt sm" id="bkImportToggle" type="button">Impor Cadangan</button>
@@ -185,18 +191,6 @@
 			<div class="card">
 				<h2>Status Data</h2>
 				<div id="bkHealthBody"><div class="hint">Memuat...</div></div>
-			</div>
-
-			<div class="card">
-				<h2>Periode</h2>
-				<div class="hint">Periode baru mulai dari tap kamu pas beli dasar — bukan otomatis.</div>
-				<button class="btn" id="bkStartBtn" type="button" style="width:100%">Mulai Periode Baru</button>
-				<div class="hint">Tanggal mulai berlaku sejak 00:00; bila dimundurkan ke tengah periode berjalan, periode lama ditutup pada hari sebelumnya. Periode lama yang ditutup terlambat tetap berakhir pada tanggal kedaluwarsa resminya.</div>
-				<div id="bkUndoBox" style="display:none;margin-top:12px">
-					<div class="lock-note amber" style="margin-top:0">Periode baru saja dibuat. Kalau ini <b>tidak sengaja</b>, urungkan: periode sebelumnya aktif lagi persis seperti semula dan snapshot prematurnya dihapus dari riwayat.</div>
-					<button class="btn alt sm" id="bkUndoBtn" type="button" style="width:100%;margin-top:8px">Urungkan Periode Baru</button>
-				</div>
-				<div class="msg" id="bkPeriodMsg"></div>
 			</div>
 
 			<div class="card">
@@ -230,7 +224,7 @@
 					<option value="wwan0">wwan0 (bawaan app · modem)</option>
 					<option value="br-lan">br-lan (arah dibalik)</option>
 				</select>
-				<div class="hint">Sumber data periode berjalan tetap terkunci sampai periode ditutup. Pilihan ini menentukan sumber data periode berikutnya.</div>
+				<div class="hint">Periode berjalan terkunci; pilihan ini untuk periode berikutnya.</div>
 				<button class="btn" id="bkSetSave" type="button" style="width:100%;margin-top:12px">Simpan untuk Periode Berikutnya</button>
 				<div class="msg" id="bkSetMsg"></div>
 			</div>
@@ -244,12 +238,12 @@
 					<button class="btn sm" id="bkUpdateBtn" type="button" style="display:none">Update Sekarang</button>
 				</div>
 				<pre class="bk-log" id="bkUpdateLog"></pre>
-				<div class="hint">Update mengambil rilis terbaru dari GitHub repo luci-app-boundless-kuota dan memasangnya otomatis.</div>
+				<div class="hint">Update otomatis dari rilis GitHub terbaru.</div>
 			</div>
 		</div>
 	</div>
 
-	<div class="foot">Angka dari vnStat di STB ini (tersimpan berkala, bisa telat s/d ±5 menit). Sisa kuota adalah perkiraan dari traffic yang lewat STB ini — bukan angka resmi operator.</div>
+	<div class="foot">Data vnStat STB (±5 menit). Sisa kuota = perkiraan dari traffic STB, bukan angka resmi operator.</div>
 
 	<div class="modal-bg" id="bkModalBg">
 		<div class="modal" id="bkModal">
@@ -260,7 +254,7 @@
 			<input class="f" type="date" id="bkStartDate">
 			<label class="f">Blok sudah terbeli (opsional, bawaan 0)</label>
 			<input class="f" type="number" id="bkOpening" min="0" value="0">
-			<div class="hint">Isi hanya bila mulai di tengah periode dan sebagian blok memang sudah kamu beli; blok berikutnya tetap terpicu otomatis dari pemakaian.</div>
+			<div class="hint">Isi bila mulai di tengah periode dan sebagian blok sudah terbeli.</div>
 			<div class="msg" id="bkStartMsg"></div>
 			<div class="acts">
 				<button class="btn alt" id="bkCancelStart" type="button">Batal</button>
@@ -392,12 +386,12 @@ function render(){
 		html += '<div><div class="k">Sisa</div><div class="v"' + remainCls + ">" + remainTxt + "</div></div>";
 		html += '<div><div class="k">Hari ini</div><div class="v">' + gb(c.today_bytes, 1) + " GB</div></div>";
 		html += "</div>";
-		html += '<div class="lock-note">Skema periode ini dibekukan: ' + esc(schemeText(a)) + (a.iface === "br-lan" ? " · arah RX/TX dibalik" : "") + ". Perubahan di Pengaturan berlaku mulai periode berikutnya.</div>";
+		html += '<div class="lock-note">Skema dibekukan: ' + esc(schemeText(a)) + (a.iface === "br-lan" ? " · arah RX/TX dibalik" : "") + ".</div>";
 		if (!c.complete) {
-			html += '<div class="lock-note amber">Data belum lengkap: vnStat untuk interface ini baru mencatat sesudah tanggal mulai periode (' + c.missing_days + " hari tidak tercatat), jadi total terpakai adalah batas bawah.</div>";
+			html += '<div class="lock-note amber">Data belum lengkap: ' + c.missing_days + " hari awal periode tidak tercatat vnStat — total terpakai = batas bawah.</div>";
 		}
 		if (a.mode === "blok") {
-			html += '<div class="corr"><span class="lbl">Koreksi blok terbeli (pengecualian, bila pembelian nyata menyimpang):</span>' +
+			html += '<div class="corr"><span class="lbl">Koreksi blok (pengecualian):</span>' +
 				'<button class="btn alt sm" id="bkCorrMinus" type="button">&minus;1 blok</button>' +
 				'<span class="lbl">koreksi sekarang: <b>' + (a.correction > 0 ? "+" : "") + a.correction + '</b></span>' +
 				'<button class="btn alt sm" id="bkCorrPlus" type="button">+1 blok</button></div>';
@@ -417,7 +411,7 @@ function render(){
 	// Status data
 	renderHealth();
 	// Kunci catatan pengaturan
-	if (a) el("bkLockNote").textContent = "Skema dan interface periode berjalan sudah dibekukan: " + schemeText(a) + ".";
+	if (a) el("bkLockNote").textContent = "Periode berjalan dibekukan: " + schemeText(a) + ".";
 	// Undo
 	el("bkUndoBox").style.display = state.can_undo ? "block" : "none";
 	// Form pengaturan (hanya isi sekali per muat agar tidak menimpa editan)
@@ -518,9 +512,9 @@ function renderCost(){
 		var p = c.projections;
 		html += '<div class="kv"><span class="k">Proyeksi akhir periode</span><span class="v">' + rp(p.low.paid) + " &ndash; " + rp(p.high.paid) + "</span></div>";
 		html += '<div class="kv"><span class="k">Blok tambahan diperkirakan</span><span class="v">+' + p.low.add_blocks + " s/d +" + p.high.add_blocks + " blok</span></div>";
-		html += '<div class="hint">Proyeksi dari hari-hari penuh saja: rata-rata 7 hari penuh terakhir ' + gb(p.avg_7_bytes, 1) + " GB/hari vs rata-rata periode " + gb(p.avg_all_bytes, 1) + " GB/hari.</div>";
+		html += '<div class="hint">Basis: rata-rata 7 hari penuh terakhir ' + gb(p.avg_7_bytes, 1) + " GB/hari vs periode " + gb(p.avg_all_bytes, 1) + " GB/hari.</div>";
 	} else if (a.mode === "blok") {
-		html += '<div class="hint">Proyeksi muncul setelah ada minimal satu hari penuh tercatat.</div>';
+		html += '<div class="hint">Proyeksi muncul setelah ada satu hari penuh.</div>';
 	} else {
 		html += '<div class="hint">Mode paket langsung: biaya tetap ' + rp(a.direct_rp) + " untuk periode ini.</div>";
 	}
@@ -545,7 +539,7 @@ function renderHealth(){
 	html += '<div class="kv"><span class="k">Update terakhir</span><span class="v">' + esc(h.updated || "-") + "</span></div>";
 	html += '<div class="kv"><span class="k">wwan0 (modem)</span><span class="v">' + (h.wwan_monitored ? "dimonitor" : "belum dimonitor") + "</span></div>";
 	if (c) html += '<div class="kv"><span class="k">Kelengkapan periode</span><span class="v">' + (c.complete ? "lengkap" : ("kurang " + c.missing_days + " hari")) + "</span></div>";
-	html += '<div class="hint">Pemasangan pertama bersifat PnP: app otomatis memakai br-lan untuk periode pertama bila datanya sudah ada, sekaligus mengaktifkan monitoring wwan0. Periode wwan0 mulai bersih dari hari aktivasinya.</div>';
+	html += '<div class="hint">PnP: periode pertama otomatis br-lan; wwan0 aktif untuk periode berikutnya.</div>';
 	body.innerHTML = html;
 }
 
