@@ -32,6 +32,7 @@
 .bk-wrap .bk-upd{font-size:12.5px;opacity:.65}
 .bk-wrap .btn{border:none;border-radius:999px;padding:9px 18px;cursor:pointer;font-weight:600;color:var(--btn-fg,#fff);background:var(--btn-bg,linear-gradient(135deg,var(--g1),var(--g2)));font-size:13.5px}
 .bk-wrap .btn.alt{background:rgba(127,127,127,.14);color:inherit;border:1px solid rgba(127,127,127,.45)}
+.bk-wrap .btn.danger{color:#d43a3a;border-color:rgba(212,58,58,.55)}
 .bk-wrap .btn.sm{padding:5px 12px;font-size:12.5px}
 .bk-wrap .btn:disabled{opacity:.5;cursor:default}
 .bk-wrap .banner{display:none;border:1px solid rgba(217,119,6,.55);background:rgba(251,191,36,.13);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:12px 0}
@@ -169,7 +170,9 @@
 				<div class="corr">
 					<a class="btn alt sm" id="bkExportBtn" href="#">Ekspor Cadangan</a>
 					<button class="btn alt sm" id="bkImportToggle" type="button">Impor Cadangan</button>
+					<button class="btn alt sm danger" id="bkResetBtn" type="button">Reset Data App</button>
 				</div>
+				<div class="msg" id="bkResetMsg"></div>
 				<div id="bkImportBox" style="display:none;margin-top:10px">
 					<label class="f">Tempel isi file cadangan JSON (atau pilih file)</label>
 					<textarea class="f" id="bkImportText" rows="5" placeholder='{"app":"boundless-kuota", ...}'></textarea>
@@ -662,6 +665,14 @@ el("bkImportBtn").onclick = function(){
 	post("import", { data: el("bkImportText").value }, function(st, d){
 		if (d && d.ok) { msg("bkImportMsg", "Cadangan dipulihkan.", true); render.settingsFilled = false; load(); }
 		else msg("bkImportMsg", (d && d.error) || "Gagal memulihkan cadangan.", false);
+	});
+};
+
+el("bkResetBtn").onclick = function(){
+	if (!confirm("Reset data app? Semua snapshot riwayat dan periode aktif terhapus permanen. Pengaturan dipertahankan; data vnStat tidak disentuh.")) return;
+	post("reset", {}, function(st, d){
+		if (d && d.ok) { msg("bkResetMsg", "Data app direset; periode awal dibuat ulang dari vnStat.", true); render.settingsFilled = false; load(); }
+		else msg("bkResetMsg", (d && d.error) || "Gagal reset data app.", false);
 	});
 };
 

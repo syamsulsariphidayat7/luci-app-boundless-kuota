@@ -36,6 +36,8 @@ function index()
 		call("action_export")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "import"},
 		post("action_import")).leaf = true
+	entry({"admin", "services", "boundlesskuota", "reset"},
+		post("action_reset")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "version"},
 		call("action_version")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "check"},
@@ -699,6 +701,26 @@ function action_import()
 	end
 	uci:commit(CONFIG)
 	write_json({ ok = true })
+end
+
+-- Reset data app: hapus semua snapshot riwayat + periode aktif +
+-- cadangan urungkan, dan buka lagi gerbang inisialisasi PnP (flag
+-- initialized) supaya status berikutnya membuat periode awal dari
+-- vnStat seperti pemasangan pertama. Pengaturan dipertahankan;
+-- vnStat tidak disentuh.
+function action_reset()
+	if not require_post() then return end
+	local uci = new_cursor()
+	local doomed = {}
+	uci:foreach(CONFIG, "snapshot", function(s) doomed[#doomed + 1] = s[".name"] end)
+	for _, n in ipairs(doomed) do uci:delete(CONFIG, n) end
+	delete_section(uci, "active")
+	delete_section(uci, "lastclose")
+	if section_exists(uci, "settings") then
+		uci:set(CONFIG, "settings", "initialized", "0")
+	end
+	uci:commit(CONFIG)
+	return write_json({ ok = true })
 end
 
 -- ---------- Versi & Update (pola luci-app-boundless-tools) ----------
