@@ -175,8 +175,17 @@ local function new_cursor()
 	return luci.model.uci.cursor()
 end
 
+-- Keberadaan section TIDAK bisa dicek dengan uci:get 2 argumen
+-- (tanpa opsi ia tidak mengembalikan isi section di libuci asli);
+-- pakai get_all. Pelajaran dari bug urungkan 0.1.5: delete_section
+-- yang digerbangi get 2 argumen tidak pernah benar-benar menghapus.
+local function section_exists(uci, name)
+	if not name then return false end
+	return uci:get_all(CONFIG, name) ~= nil
+end
+
 local function get_settings(uci)
-	if not uci:get(CONFIG, "settings") then
+	if not section_exists(uci, "settings") then
 		uci:section(CONFIG, "settings", "settings")
 		for k, v in pairs(DEFAULTS) do uci:set(CONFIG, "settings", k, v) end
 		uci:commit(CONFIG)
@@ -227,7 +236,7 @@ local function write_period(uci, name, p)
 end
 
 local function delete_section(uci, name)
-	if name and uci:get(CONFIG, name) then
+	if section_exists(uci, name) then
 		uci:delete(CONFIG, name)
 		return true
 	end
@@ -409,7 +418,7 @@ function action_status()
 		} or nil,
 		history = history,
 		totals = totals,
-		can_undo = uci:get(CONFIG, "lastclose") ~= nil,
+		can_undo = section_exists(uci, "lastclose"),
 		health = health,
 	})
 end
@@ -502,14 +511,24 @@ end
 function action_undo()
 	if not require_post() then return end
 	local uci = new_cursor()
-	if not uci:get(CONFIG, "lastclose") then
+	if not section_exists(uci, "lastclose") then
 		return write_json({ ok = false, error = "Tidak ada periode yang bisa diurungkan." }, 400)
 	end
 	local sid = uci:get(CONFIG, "lastclose", "snapshot_id")
-	if sid then delete_section(uci, sid) end
 	local p = {}
 	for _, k in ipairs(PERIOD_KEYS) do
 		p[k] = uci:get(CONFIG, "lastclose", k)
+	end
+	if sid then delete_section(uci, sid) end
+	-- Sapu-bersih cadangan: snapshot prematur adalah satu-satunya
+	-- snapshot yang tanggal mulainya SAMA dengan tanggal mulai
+	-- periode yang dipulihkan (snapshot sah selalu mulai lebih awal).
+	if p.start then
+		local doomed = {}
+		uci:foreach(CONFIG, "snapshot", function(s)
+			if s.start == p.start then doomed[#doomed + 1] = s[".name"] end
+		end)
+		for _, n in ipairs(doomed) do uci:delete(CONFIG, n) end
 	end
 	delete_section(uci, "active")
 	uci:section(CONFIG, "period", "active")
@@ -600,7 +619,7 @@ end
 -- ---------- ekspor / impor cadangan ----------
 
 local function section_map(uci, name, keys)
-	if not uci:get(CONFIG, name) then return nil end
+	if not section_exists(uci, name) then return nil end
 	local m = {}
 	for _, k in ipairs(keys) do
 		local v = uci:get(CONFIG, name, k)
@@ -650,7 +669,7 @@ function action_import()
 	for _, n in ipairs(doomed) do uci:delete(CONFIG, n) end
 
 	if type(data.settings) == "table" then
-		if not uci:get(CONFIG, "settings") then
+		if not section_exists(uci, "settings") then
 			uci:section(CONFIG, "settings", "settings")
 		end
 		for _, k in ipairs(SETTINGS_KEYS) do
