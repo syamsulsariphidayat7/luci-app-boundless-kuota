@@ -394,7 +394,7 @@ function action_status()
 		totals.hangus_bytes = totals.hangus_bytes + h.hangus_bytes
 	end
 	if computed then
-		totals.used_bytes = totals.used_bytes + computed.used_bytes
+		totals.used_bytes = totals.used_bytes + (computed.eff_used_bytes or computed.used_bytes)
 		totals.paid = totals.paid + computed.paid
 		totals.duration_days = totals.duration_days + computed.day_number
 	end

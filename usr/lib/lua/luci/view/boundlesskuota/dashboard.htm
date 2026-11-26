@@ -535,7 +535,7 @@ function renderHistory(){
 		var hangusRun = "&ndash;";
 		rows += '<tr><td>' + fmtDate(a.start) + ' &ndash; sekarang <span class="pill run">Berjalan</span></td>' +
 			'<td class="r">' + c.day_number + " / " + c.days_total + " hari</td>" +
-			'<td class="r">' + gb(c.used_bytes, 1) + " GB</td>" +
+			'<td class="r">' + gb(c.eff_used_bytes != null ? c.eff_used_bytes : c.used_bytes, 1) + " GB</td>" +
 			'<td class="r">' + rp(c.paid) + "</td>" +
 			'<td class="r">' + hangusRun + "</td></tr>";
 	}
@@ -646,7 +646,7 @@ el("bkStartBtn").onclick = function(){
 		block_rp: Number(state.settings.block_rp), days: Number(state.settings.days),
 		direct_rp: Number(state.settings.direct_rp), direct_gb: Number(state.settings.direct_gb),
 		iface: state.settings.next_iface });
-	el("bkModalSummary").textContent = "Yang akan ditutup: periode " + fmtDate(a.start) + " – " + fmtDate(c.expiry) + " · terpakai " + gb(c.used_bytes, 1) + " GB · biaya " + rp(c.paid) + (c.remain_bytes ? (" · sisa " + gb(c.remain_bytes, 1) + " GB jadi hangus") : "") + ". Pastikan ini memang disengaja.";
+	el("bkModalSummary").textContent = "Yang akan ditutup: periode " + fmtDate(a.start) + " – " + fmtDate(c.expiry) + " · terpakai " + gb(c.eff_used_bytes != null ? c.eff_used_bytes : c.used_bytes, 1) + " GB · biaya " + rp(c.paid) + (c.remain_bytes ? (" · sisa " + gb(c.remain_bytes, 1) + " GB jadi hangus") : "") + ". Pastikan ini memang disengaja.";
 	el("bkStartDate").value = state.today;
 	el("bkOpening").value = "0";
 	msg("bkStartMsg", "", true);

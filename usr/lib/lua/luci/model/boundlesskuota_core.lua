@@ -395,7 +395,7 @@ function M.snapshot(all_days, period, end_date)
 		start = period.start,
 		end_date = end_date,
 		duration_days = M.day_diff(period.start, end_date) or 0,
-		used_bytes = w.used_bytes,
+		used_bytes = w.eff_used_bytes,
 		dl_bytes = w.dl_bytes,
 		ul_bytes = w.ul_bytes,
 		blocks = w.blocks,
