@@ -15,12 +15,24 @@
 --   direct_gb       = kuota paket (GB desimal; 0 = tanpa batas),
 --   opening_blocks  = blok tambahan yang sudah terbeli di luar inferensi,
 --   correction      = koreksi manual atas blok terbeli (boleh negatif),
+--   anchor_vnstat   = terpakai vnStat (byte) saat sinkron operator,
+--   anchor_eff      = terpakai efektif/operator (byte) saat sinkron,
+--   anchor_blocks   = blok riil terbeli saat sinkron,
+--   anchor_date     = tanggal sinkron terakhir "YYYY-MM-DD",
 -- }
+--
+-- Model jangkar (0.2.0): vnStat dan operator menghitung traffic dengan
+-- cara berbeda, jadi inferensi blok dari vnStat mentah meleset.
+-- Sesudah disinkronkan, terpakai efektif = terpakai vnStat dikurangi
+-- selisih tetap (anchor_vnstat - anchor_eff); kenaikan traffic
+-- sesudahnya dihitung 1:1. Blok/biaya/sisa dihitung dari terpakai
+-- efektif; angka traffic mentah (harian, DL/UL) tetap vnStat.
 -- days = { { date="YYYY-MM-DD", bytes=N, dl=N, ul=N }, ... } terurut.
 
 local M = {}
 
 local GB = 1000000000
+M.GB = GB
 
 -- ---------- tanggal ----------
 
@@ -112,6 +124,25 @@ function M.total_blocks(used_bytes, period)
 	return n
 end
 
+-- Selisih tetap antara vnStat dan operator dari jangkar (byte).
+-- nil bila periode belum pernah disinkronkan.
+function M.anchor_offset(period)
+	local av, ae = tonumber(period.anchor_vnstat), tonumber(period.anchor_eff)
+	if av and ae then return av - ae end
+	return nil
+end
+
+-- Terpakai efektif (versi operator) dari terpakai mentah vnStat.
+-- Tanpa jangkar: sama dengan mentah. Dengan jangkar: mentah
+-- dikurangi selisih tetap, minimum 0.
+function M.effective_used(used_bytes, period)
+	local off = M.anchor_offset(period)
+	if not off then return used_bytes end
+	local eff = used_bytes - off
+	if eff < 0 then eff = 0 end
+	return eff
+end
+
 -- Kuota terbeli (byte) dan biaya menurut skema. purchased=nil berarti
 -- tanpa batas (mode langsung dengan direct_gb=0).
 function M.purchased_and_paid(used_bytes, period)
@@ -120,6 +151,17 @@ function M.purchased_and_paid(used_bytes, period)
 		local purchased = nil
 		if gb > 0 then purchased = gb * GB end
 		return purchased, tonumber(period.direct_rp) or 0, 0
+	end
+	if M.anchor_offset(period) then
+		-- Mode jangkar: blok dari terpakai efektif, tidak pernah
+		-- di bawah blok riil yang dinyatakan saat sinkron.
+		local eff = M.effective_used(used_bytes, period)
+		local blocks = M.inferred_blocks(eff, period)
+		local ab = tonumber(period.anchor_blocks) or 0
+		if blocks < ab then blocks = ab end
+		local purchased = blocks * (tonumber(period.block_gb) or 10) * GB
+		local paid = (tonumber(period.base) or 0) + blocks * (tonumber(period.block_rp) or 0)
+		return purchased, paid, blocks
 	end
 	local blocks = M.total_blocks(used_bytes, period)
 	local purchased = blocks * (tonumber(period.block_gb) or 10) * GB
@@ -164,20 +206,24 @@ local function compute_window(all_days, period, end_exclusive)
 	end
 
 	local purchased, paid, blocks = M.purchased_and_paid(used, period)
+	local eff_used = M.effective_used(used, period)
 	local rate = used_rate(period)
 	local up = upfront(period)
 
-	-- Rincian harian: Biaya/Hari mengikuti inferensi blok hari itu
-	-- (hari pertama termasuk biaya di muka); Nilai Terpakai/Hari
-	-- mengikuti GB hari itu x tarif. Koreksi/blok awal tidak masuk
-	-- rincian harian, hanya total periode.
+	-- Rincian harian: Biaya/Hari mengikuti inferensi blok dari
+	-- kumulatif EFEKTIF hari itu (hari pertama termasuk biaya di
+	-- muka); Nilai Terpakai/Hari mengikuti kenaikan efektif hari
+	-- itu x tarif. Tanpa jangkar efektif = mentah, jadi perilaku
+	-- lama tidak berubah. Koreksi/blok awal tidak masuk rincian
+	-- harian, hanya total periode.
 	local daily = {}
-	local cum, prev_inf = 0, 0
+	local cum, prev_inf, prev_ecum = 0, 0, 0
 	for i, d in ipairs(rows) do
 		cum = cum + d.bytes
+		local ecum = M.effective_used(cum, period)
 		local inf = 0
 		if period.mode ~= "langsung" then
-			inf = M.inferred_blocks(cum, period)
+			inf = M.inferred_blocks(ecum, period)
 		end
 		local dcost
 		if period.mode == "langsung" then
@@ -192,30 +238,33 @@ local function compute_window(all_days, period, end_exclusive)
 			dl = d.dl,
 			ul = d.ul,
 			cum_bytes = cum,
+			eff_cum_bytes = ecum,
 			inferred_blocks = inf,
 			daily_cost = dcost,
-			daily_used_value = d.bytes * rate,
+			daily_used_value = (ecum - prev_ecum) * rate,
 			cum_cost = up + inf * (tonumber(period.block_rp) or 0),
 		}
 		prev_inf = inf
+		prev_ecum = ecum
 	end
 	if period.mode == "langsung" then
 		for _, r in ipairs(daily) do r.cum_cost = up end
 	end
 
 	local remain = nil
-	if purchased ~= nil then remain = purchased - used end
+	if purchased ~= nil then remain = purchased - eff_used end
 	local hangus = 0
 	if remain ~= nil and remain > 0 then hangus = remain end
 
 	return {
 		used_bytes = used,
+		eff_used_bytes = eff_used,
 		dl_bytes = dl,
 		ul_bytes = ul,
 		blocks = blocks,
 		purchased_bytes = purchased,
 		paid = paid,
-		used_value = up + used * rate,
+		used_value = up + eff_used * rate,
 		remain_bytes = remain,
 		hangus_bytes = hangus,
 		daily = daily,
@@ -268,10 +317,17 @@ function M.compute(all_days, period, today, now_epoch)
 			if remain_days < 0 then remain_days = 0 end
 		end
 		local function project(avg_bytes)
-			local total = w.used_bytes + avg_bytes * remain_days
+			-- Proyeksi berjalan di ruang efektif: posisi efektif
+			-- sekarang + pertumbuhan mentah rata-rata ke depan.
+			local total = w.eff_used_bytes + avg_bytes * remain_days
 			local inf = M.inferred_blocks(total, period)
-			local tb = inf + (tonumber(period.opening_blocks) or 0)
-				+ (tonumber(period.correction) or 0)
+			local tb
+			if M.anchor_offset(period) then
+				tb = inf
+			else
+				tb = inf + (tonumber(period.opening_blocks) or 0)
+					+ (tonumber(period.correction) or 0)
+			end
 			if tb < w.blocks then tb = w.blocks end
 			if tb < 0 then tb = 0 end
 			return {
@@ -315,13 +371,14 @@ function M.compute(all_days, period, today, now_epoch)
 		day_number = day_number,
 		days_total = ndays,
 		used_bytes = w.used_bytes,
+		eff_used_bytes = w.eff_used_bytes,
 		dl_bytes = w.dl_bytes,
 		ul_bytes = w.ul_bytes,
 		blocks = w.blocks,
 		purchased_bytes = w.purchased_bytes,
 		paid = w.paid,
 		used_value = w.used_value,
-		eff_price_per_gb = w.used_bytes > 0 and (w.paid / (w.used_bytes / GB)) or 0,
+		eff_price_per_gb = w.eff_used_bytes > 0 and (w.paid / (w.eff_used_bytes / GB)) or 0,
 		remain_bytes = w.remain_bytes,
 		today_bytes = today_bytes,
 		daily = w.daily,

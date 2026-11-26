@@ -28,6 +28,8 @@ function index()
 		post("action_undo")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "correct"},
 		post("action_correct")).leaf = true
+	entry({"admin", "services", "boundlesskuota", "sync"},
+		post("action_sync")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "settings"},
 		post("action_settings")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "setup"},
@@ -64,7 +66,8 @@ local SETTINGS_KEYS = { "mode", "base", "block_gb", "block_rp", "days",
 	"direct_rp", "direct_gb", "next_iface", "setup_done", "initialized" }
 local PERIOD_KEYS   = { "start", "iface", "mode", "base", "block_gb",
 	"block_rp", "days", "direct_rp", "direct_gb", "opening_blocks",
-	"correction", "auto" }
+	"correction", "auto", "anchor_vnstat", "anchor_eff",
+	"anchor_blocks", "anchor_date" }
 local SNAPSHOT_KEYS = { "start", "end_date", "duration_days", "used_bytes",
 	"dl_bytes", "ul_bytes", "blocks", "purchased_bytes", "paid",
 	"hangus_bytes", "iface", "mode", "base", "block_gb", "block_rp",
@@ -221,6 +224,10 @@ local function period_from_section(uci, name)
 		opening_blocks = tonumber(p.opening_blocks) or 0,
 		correction = tonumber(p.correction) or 0,
 		auto = p.auto or "0",
+		anchor_vnstat = tonumber(p.anchor_vnstat),
+		anchor_eff = tonumber(p.anchor_eff),
+		anchor_blocks = tonumber(p.anchor_blocks),
+		anchor_date = p.anchor_date,
 	}
 end
 
@@ -234,6 +241,12 @@ local function write_period(uci, name, p)
 		opening_blocks = fmt_num(p.opening_blocks),
 		correction = fmt_num(p.correction), auto = p.auto or "0",
 	}
+	if p.anchor_vnstat ~= nil then
+		vals.anchor_vnstat = fmt_num(p.anchor_vnstat)
+		vals.anchor_eff = fmt_num(p.anchor_eff)
+		vals.anchor_blocks = fmt_num(p.anchor_blocks)
+		vals.anchor_date = p.anchor_date
+	end
 	for k, v in pairs(vals) do uci:set(CONFIG, name, k, v) end
 end
 
@@ -416,6 +429,10 @@ function action_status()
 			direct_rp = active.direct_rp, direct_gb = active.direct_gb,
 			opening_blocks = active.opening_blocks,
 			correction = active.correction, auto = active.auto,
+			anchor_vnstat = active.anchor_vnstat,
+			anchor_eff = active.anchor_eff,
+			anchor_blocks = active.anchor_blocks,
+			anchor_date = active.anchor_date,
 			computed = computed,
 		} or nil,
 		history = history,
@@ -558,6 +575,55 @@ function action_correct()
 	uci:set(CONFIG, "active", "correction", fmt_num(n))
 	uci:commit(CONFIG)
 	write_json({ ok = true, correction = n })
+end
+
+-- Sinkronkan ke operator (model jangkar 0.2.0): pengguna menyatakan
+-- blok riil yang sudah dibeli + sisa kuota versi operator saat ini.
+-- App menyimpan titik jangkar: terpakai vnStat sekarang berpasangan
+-- dengan terpakai efektif versi operator (terbeli riil - sisa).
+-- Sesudahnya blok/biaya/sisa dihitung dari terpakai efektif; lihat
+-- M.effective_used di core. Mode langsung: terbeli riil = kuota
+-- paket, blok diabaikan.
+function action_sync()
+	if not require_post() then return end
+	local blocks_real = tonumber(luci.http.formvalue("blocks"))
+	local remain_txt = luci.http.formvalue("remaining_gb")
+	local remain_gb = remain_txt and tonumber((remain_txt:gsub(",", "."))) or nil
+	local uci = new_cursor()
+	local active = period_from_section(uci, "active")
+	if not active then
+		return write_json({ ok = false, error = "Belum ada periode aktif." }, 400)
+	end
+	local purchased_real
+	if active.mode == "langsung" then
+		purchased_real = (tonumber(active.direct_gb) or 0) * core.GB
+		blocks_real = 0
+	else
+		if not blocks_real or blocks_real < 0 or blocks_real > 100000
+			or blocks_real ~= math.floor(blocks_real) then
+			return write_json({ ok = false,
+				error = "Isi dulu jumlah blok riil yang sudah dibeli." }, 400)
+		end
+		purchased_real = blocks_real * (tonumber(active.block_gb) or 10) * core.GB
+	end
+	if not remain_gb or remain_gb < 0 then
+		return write_json({ ok = false,
+			error = "Isi dulu sisa kuota versi operator (GB)." }, 400)
+	end
+	local remain_bytes = remain_gb * core.GB
+	if remain_bytes > purchased_real then
+		return write_json({ ok = false,
+			error = "Sisa operator melebihi kuota terbeli — cek lagi angkanya." }, 400)
+	end
+	local vdata = vnstat_data()
+	local computed = core.compute(iface_days(vdata, active.iface),
+		active, today_str(), os.time())
+	uci:set(CONFIG, "active", "anchor_vnstat", fmt_num(computed.used_bytes))
+	uci:set(CONFIG, "active", "anchor_eff", fmt_num(purchased_real - remain_bytes))
+	uci:set(CONFIG, "active", "anchor_blocks", fmt_num(blocks_real))
+	uci:set(CONFIG, "active", "anchor_date", today_str())
+	uci:commit(CONFIG)
+	return write_json({ ok = true })
 end
 
 function action_settings()
