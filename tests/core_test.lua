@@ -140,5 +140,22 @@ eq(#snap.purchases, 2, "snapshot: daftar pembelian ikut tersimpan")
 eq(snap.purchases[1].date, "2026-10-22", "snapshot: tanggal pembelian pertama")
 eq(snap.purchases[1].price, 30000, "snapshot: harga pembelian pertama")
 
+-- ===== Sisa terpakai + rincian bucket (0.4.1) =====
+local stb = core.api_seed({ benefit("IG", 10, 10, 999), benefit("Bonus5G", 100, 100, 888) }, 0)
+near(core.usable_remaining(stb) / GB, 110, 0.001, "sisa: belum ada aktivitas -> semua sisa live")
+core.api_update(stb, { benefit("IG", 10, 6, 999), benefit("Bonus5G", 100, 100, 888) })
+near(core.usable_remaining(stb) / GB, 6, 0.001, "sisa: hanya bucket aktif terpakai (IG 6 GB; 5G 100 GB dikecualikan)")
+local bl = core.bucket_list(stb)
+eq(#bl, 2, "bucket: 2 entri")
+eq(bl[1].name, "IG", "bucket: aktif terurut pertama, nama terurai dari kunci")
+eq(bl[1].active, true, "bucket: IG aktif")
+eq(bl[2].active, false, "bucket: 5G tidak aktif")
+near(bl[2].remaining_bytes / GB, 100, 0.001, "bucket: sisa 5G tetap terlihat di rincian")
+-- Bucket aktif yang membeku dikeluarkan dari sisa terpakai.
+local stf = core.api_seed({ benefit("A", 10, 10, 1), benefit("B", 10, 10, 2) }, 0)
+core.api_update(stf, { benefit("A", 10, 5, 1), benefit("B", 10, 5, 2) })
+core.api_update(stf, { benefit("A", 10, 4, 1) })
+near(core.usable_remaining(stf) / GB, 4, 0.001, "sisa: bucket beku (B) dikeluarkan, tinggal A 4 GB")
+
 print(string.format("HASIL: %d lulus, %d gagal", pass, fail))
 TEST_FAIL = fail

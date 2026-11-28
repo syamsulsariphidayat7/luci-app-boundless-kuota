@@ -36,8 +36,13 @@ app ini buku catatannya. Sejak 0.4.0 satu-satunya sumber app ini adalah
 - **Harga/GB efektif** = total biaya tercatat ÷ total terpakai
   operator — tersedia sebagai angka periode dan per hari (kumulatif)
   di tabel harian, bersama biaya riil per tanggal pembelian.
-- **Sisa** yang ditampilkan adalah sisa operator langsung (jumlah
-  sisa semua paket live di welcome), bukan hasil rumus.
+- **Sisa** yang ditampilkan adalah sisa bucket yang **aktif
+  terpakai** saja (dari angka operator langsung di welcome).
+  Kuota khusus yang tidak pernah terpakai trafik pengguna —
+  bonus aplikasi lain, kuota 5G, bundling — tidak ikut dihitung
+  karena sisa mereka memang tidak bisa dipakai; total semua
+  paket tetap ditampilkan sebagai info. Kartu Periode juga
+  memuat rincian sisa + terpakai per bucket dari operator.
 - **Periode** dimulai manual lewat tombol *Mulai Periode Baru* (pas
   beli dasar), tanggal mulai bisa dimundurkan; periode lama ditutup
   sebagai **snapshot permanen** di riwayat — lengkap dengan daftar

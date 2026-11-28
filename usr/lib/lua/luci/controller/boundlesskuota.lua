@@ -420,7 +420,8 @@ function action_status()
 			day_number = day_number,
 			days_total = active.days,
 			used_bytes = used,
-			remaining_bytes = st and st.last_remaining or nil,
+			remaining_bytes = st and core.usable_remaining(st) or nil,
+			remaining_all_bytes = st and st.last_remaining or nil,
 			today_bytes = today_bytes,
 			daily = daily,
 			purchases_total = purch.total,
@@ -430,6 +431,7 @@ function action_status()
 		api.purchases = purch.list
 		api.purchases_total = purch.total
 		api.purchases_count = purch.count
+		api.buckets = st and core.bucket_list(st) or {}
 		api.last_fetch = st and st.last_fetch or nil
 	end
 

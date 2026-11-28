@@ -365,7 +365,10 @@ function render(){
 			var denom = c.used_bytes + c.remaining_bytes;
 			var pct = denom > 0 ? Math.min(100, c.used_bytes / denom * 100) : 0;
 			html += '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
-			html += '<div class="hint" style="margin:0">Terpakai ' + gb(c.used_bytes, 1) + " GB dari \u00B1" + gb(denom, 1) + " GB yang tersedia (terpakai + sisa operator saat ini).</div>";
+			html += '<div class="hint" style="margin:0">Terpakai ' + gb(c.used_bytes, 1) + " GB dari \u00B1" + gb(denom, 1) + " GB yang tersedia (terpakai + sisa bucket aktif saat ini).</div>";
+		}
+		if (c.remaining_all_bytes != null && c.remaining_bytes != null && c.remaining_all_bytes !== c.remaining_bytes) {
+			html += '<div class="hint">Sisa semua paket: ' + gb(c.remaining_all_bytes, 1) + ' GB — termasuk kuota khusus (aplikasi/5G/bundling) yang tidak terpakai trafik ini; yang dihitung di atas hanya bucket yang aktif terpakai.</div>';
 		}
 		var left = c.days_total - c.day_number;
 		html += '<div class="hint">Hari ke-' + c.day_number + " dari " + c.days_total
@@ -374,13 +377,23 @@ function render(){
 		html += '<div class="meta">';
 		var remainTxt = c.remaining_bytes == null ? "&mdash;" : gb(c.remaining_bytes, 1) + " GB";
 		var remainCls = (c.remaining_bytes != null && c.remaining_bytes < 2 * GB) ? ' style="color:var(--amber)"' : "";
-		html += '<div><div class="k">Sisa (operator)</div><div class="v"' + remainCls + ">" + remainTxt + "</div></div>";
+		html += '<div><div class="k">Sisa (bucket aktif)</div><div class="v"' + remainCls + ">" + remainTxt + "</div></div>";
 		html += '<div><div class="k">Hari ini</div><div class="v">' + gb(c.today_bytes, 1) + " GB</div></div>";
 		html += '<div><div class="k">Terpakai</div><div class="v">' + gb(c.used_bytes, 1) + " GB</div></div>";
 		html += '<div><div class="k">Biaya</div><div class="v">' + rp(c.purchases_total) + "</div></div>";
 		html += "</div>";
+		var buckets = api.buckets || [];
+		if (buckets.length) {
+			html += '<div style="margin-top:14px;border-top:1px solid rgba(127,127,127,.18);padding-top:10px">';
+			html += '<div class="hint" style="margin:0 0 4px">Rincian bucket dari operator:</div>';
+			for (var bi = 0; bi < buckets.length; bi++) {
+				var bk = buckets[bi];
+				html += '<div class="kv"' + (bk.active ? "" : ' style="opacity:.55"') + '><span class="k">' + esc(bk.name) + (bk.frozen ? " (sudah tidak live)" : "") + (bk.active ? "" : " · tidak terpakai") + '</span><span class="v">sisa ' + gb(bk.remaining_bytes, 1) + " GB · terpakai " + gb(bk.used_bytes, 1) + " GB</span></div>";
+			}
+			html += "</div>";
+		}
 		if (h.api_active) {
-			html += '<div class="lock-note">Sumber: API Sunset — nomor ' + esc(api.number || "-") + ". Biaya = pembelian resmi XL dengan harga riil; terpakai dan sisa = angka operator langsung.</div>";
+			html += '<div class="lock-note">Sumber: API Sunset — nomor ' + esc(api.number || "-") + ". Biaya = pembelian resmi XL dengan harga riil; terpakai dan sisa bucket aktif = angka operator langsung.</div>";
 		} else if (h.api_stale) {
 			html += '<div class="lock-note amber">API Sunset tidak terjangkau — angka di halaman ini adalah data terakhir diambil ' + fmtDateTime(api.last_fetch) + " WIB.</div>";
 		} else if (!h.api_configured) {
@@ -562,6 +575,8 @@ function renderHealth(){
 	html += '<div class="kv"><span class="k">Sumber data</span><span class="v">API Sunset (operator)</span></div>';
 	if (api.number) html += '<div class="kv"><span class="k">Nomor aktif</span><span class="v">' + esc(api.number) + "</span></div>";
 	html += '<div class="kv"><span class="k">Ambil terakhir</span><span class="v">' + fmtDateTime(api.last_fetch) + "</span></div>";
+	var cc = a ? a.computed : null;
+	if (cc && cc.remaining_all_bytes != null) html += '<div class="kv"><span class="k">Sisa semua paket</span><span class="v">' + gb(cc.remaining_all_bytes, 1) + " GB</span></div>";
 	html += '<div class="hint">Data diambil segar setiap halaman ini dibuka — tidak ada cache dan tidak ada snapshot latar. Hari tanpa kunjungan menyatu ke hari kunjungan berikutnya di tabel harian.</div>';
 	body.innerHTML = html;
 }

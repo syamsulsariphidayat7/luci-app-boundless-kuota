@@ -174,6 +174,66 @@ function M.api_used(st)
 	return total
 end
 
+-- Sisa satu entri peta paket pada ambil terakhir (byte, >= 0).
+local function entry_remaining(e)
+	local r = (tonumber(e.total) or 0) - (tonumber(e.last_used) or 0)
+	if r < 0 then r = 0 end
+	return r
+end
+
+-- Bucket "aktif terpakai": terbukti melayani pemakaian — akumulasi
+-- periode ini bergerak, atau terpakai siklus berjalannya > 0.
+-- Bucket kuota khusus (bonus aplikasi lain, 5G, bundling) yang
+-- tidak pernah terpakai TIDAK ikut: sisa mereka tidak bisa dipakai
+-- trafik pengguna, jadi mengikutkannya ke sisa menyesatkan.
+local function entry_active(e)
+	return entry_acc(e) > 0 or (tonumber(e.last_used) or 0) > 0
+end
+
+-- Sisa yang bisa dipakai (byte): jumlah sisa bucket aktif terpakai
+-- yang masih live (tidak beku). Bila belum ada bucket yang terbukti
+-- aktif (awal periode), semua sisa live adalah jawabannya.
+function M.usable_remaining(st)
+	local active_sum, all_sum = 0, 0
+	local any_active = false
+	for _, e in pairs(st.bmap or {}) do
+		if not e.frozen then
+			local r = entry_remaining(e)
+			all_sum = all_sum + r
+			if entry_active(e) then
+				active_sum = active_sum + r
+				any_active = true
+			end
+		end
+	end
+	if not any_active then return all_sum end
+	return active_sum
+end
+
+-- Rincian per bucket untuk dashboard: nama diurai dari kunci
+-- (nama|epoch kedaluwarsa); used = terpakai siklus berjalan
+-- (angka yang sama dengan yang ditampilkan app Sunset).
+-- Terurut: aktif dulu, lalu sisa terbesar.
+function M.bucket_list(st)
+	local list = {}
+	for key, e in pairs(st.bmap or {}) do
+		list[#list + 1] = {
+			name = key:match("^(.*)|[^|]*$") or key,
+			total_bytes = tonumber(e.total) or 0,
+			remaining_bytes = entry_remaining(e),
+			used_bytes = tonumber(e.last_used) or 0,
+			acc_bytes = entry_acc(e),
+			frozen = e.frozen or false,
+			active = entry_active(e),
+		}
+	end
+	table.sort(list, function(a, b)
+		if a.active ~= b.active then return a.active end
+		return a.remaining_bytes > b.remaining_bytes
+	end)
+	return list
+end
+
 -- Ganti nomor aktif: total terpakai dipertahankan sebagai offset
 -- baru, peta paket disemai ulang dari daftar live nomor baru.
 function M.api_reseed(st, live)

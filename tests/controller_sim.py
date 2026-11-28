@@ -64,6 +64,8 @@ WELCOME = {"ok": True, "number": "628123456", "quotas": [
      "total_bytes": 20 * GB, "remaining_bytes": 20 * GB},
     {"name": "Bonus Kuota Instagram 10GB", "expired_at": 1796000000,
      "total_bytes": 10 * GB, "remaining_bytes": 10 * GB},
+    {"name": "Quota Bonus 5G", "expired_at": 1798000000,
+     "total_bytes": 100 * GB, "remaining_bytes": 100 * GB},
 ]}
 HISTORY = {"ok": True, "transactions": [
     {"timestamp": noon_ts(YEST), "title": "Xtra Combo Plus", "price": 35000,
@@ -253,8 +255,9 @@ s = call_action("action_status")
 check(s["health"]["api_active"] is True, "api: terhubung")
 c = s["active"]["computed"]
 check(c["used_bytes"] == 0, "api: terpakai awal 0")
-check(c["remaining_bytes"] == 30 * GB, "api: sisa operator = jumlah semua paket",
+check(c["remaining_bytes"] == 130 * GB, "api: belum ada aktivitas -> sisa = semua paket live",
       str(c["remaining_bytes"]))
+check(c["remaining_all_bytes"] == 130 * GB, "api: sisa semua paket 130 GB")
 check(s["api"]["purchases_count"] == 4, "api: 4 pembelian SUCCESS paket (Reload+FAILED tersaring)",
       str(s["api"].get("purchases_count")))
 check(s["api"]["purchases_total"] == 44000, "api: total tercatat Rp44.000",
@@ -276,6 +279,10 @@ check(len(_it) == 1 and _it[0]["price"] == 30000 and _it[0].get("overridden") is
 set_welcome(20, 6)
 s = call_action("action_status")
 check(s["active"]["computed"]["used_bytes"] == 4 * GB, "reset: IG terpakai 4 GB")
+check(s["active"]["computed"]["remaining_bytes"] == 6 * GB,
+      "sisa: hanya bucket aktif (IG 6 GB; XCP belum bergerak, 5G kuota khusus)",
+      str(s["active"]["computed"]["remaining_bytes"]))
+check(s["active"]["computed"]["remaining_all_bytes"] == 126 * GB, "sisa: semua paket 126 GB")
 set_welcome(20, 0)
 s = call_action("action_status")
 check(s["active"]["computed"]["used_bytes"] == 10 * GB, "reset: IG habis = 10 GB")
@@ -290,7 +297,12 @@ check(c["used_bytes"] == 15 * GB, "reset: XCP +2 & IG bucket baru +3 = 15 GB",
       str(c["used_bytes"]))
 check(abs(c["price_per_gb"] - 2600) < 1, "harga/GB efektif = 39.000/15 = Rp2.600",
       str(c["price_per_gb"]))
-check(c["remaining_bytes"] == 25 * GB, "sisa operator kini 25 GB")
+check(c["remaining_bytes"] == 25 * GB, "sisa bucket aktif kini 25 GB (XCP 18 + IG 7)")
+check(c["remaining_all_bytes"] == 125 * GB, "sisa semua paket 125 GB (termasuk 5G 100 GB)")
+_bk = {b["name"]: b for b in s["api"]["buckets"]}
+check(len(_bk) == 3, "bucket: rincian 3 bucket dari operator")
+check(_bk["Quota Bonus 5G"]["active"] is False, "bucket: 5G ditandai tidak terpakai")
+check(_bk["Bonus Kuota Instagram 10GB"]["active"] is True, "bucket: IG ditandai aktif")
 
 # 9) Tabel harian: biaya mengikuti tanggal beli riil.
 rows = {r["date"]: r for r in c["daily"]}
