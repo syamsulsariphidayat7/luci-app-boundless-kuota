@@ -6,8 +6,11 @@
 -- yang sama dengan luci-app-sunset):
 --   * GET /api/luci/welcome -> terpakai + sisa per paket (operator)
 --   * GET /api/luci/history -> riwayat transaksi resmi XL
--- vnStat tidak lagi dibaca sama sekali. GB selalu DESIMAL
--- (byte / 1e9), mengikuti cara operator menghitung kuota.
+-- vnStat tidak lagi dibaca sama sekali. Satuan GB mengikuti
+-- operator: BINER, 1 GB = 2^30 byte (seperti MyXL/Sunset) —
+-- terbukti 2026-11-28: bucket "100 GB" berisi 100 x 2^30 byte.
+-- Konstanta GB di bawah hanya dipakai harga/GB dan ambang
+-- tampilan; akumulasi selalu byte mentah.
 --
 -- Keadaan API per periode ("api state", disimpan controller sebagai
 -- JSON di /etc/boundlesskuota-api.json):
@@ -43,7 +46,7 @@
 
 local M = {}
 
-local GB = 1000000000
+local GB = 1073741824
 M.GB = GB
 
 -- ---------- tanggal ----------

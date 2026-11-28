@@ -21,7 +21,7 @@ local function near(a, b, tol, name)
 		name, a, b, tostring(tol)))
 end
 
-local GB = 1000000000
+local GB = 1073741824
 local function benefit(name, total_gb, rem_gb, exp)
 	return { key = core.benefit_key(name, exp or 111), total = total_gb * GB, remaining = rem_gb * GB }
 end

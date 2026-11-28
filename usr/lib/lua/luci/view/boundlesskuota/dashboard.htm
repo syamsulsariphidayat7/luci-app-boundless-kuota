@@ -234,7 +234,7 @@ var CSRF_TOKEN = "<%=token%>";
 var BK_BASE = "<%=url('admin/services/boundlesskuota')%>";
 (function(){
 "use strict";
-var GB = 1000000000;
+var GB = 1073741824;
 var MONTHS = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 var state = null;
 var dailyExpanded = false;
@@ -246,6 +246,11 @@ function rp(n){ return "Rp" + Math.round(Number(n) || 0).toLocaleString("id-ID")
 function gb(bytes, dec){
 	var v = (Number(bytes) || 0) / GB;
 	return v.toLocaleString("id-ID", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function gbb(bytes){
+	var b = Number(bytes) || 0;
+	if (b > 0 && b < GB) return Math.round(b / 1048576).toLocaleString("id-ID") + " MB";
+	return gb(b, 1) + " GB";
 }
 function fmtDate(iso){
 	if (!iso) return "-";
@@ -388,7 +393,7 @@ function render(){
 			html += '<div class="hint" style="margin:0 0 4px">Rincian bucket dari operator:</div>';
 			for (var bi = 0; bi < buckets.length; bi++) {
 				var bk = buckets[bi];
-				html += '<div class="kv"' + (bk.active ? "" : ' style="opacity:.55"') + '><span class="k">' + esc(bk.name) + (bk.frozen ? " (sudah tidak live)" : "") + (bk.active ? "" : " · tidak terpakai") + '</span><span class="v">sisa ' + gb(bk.remaining_bytes, 1) + " GB · terpakai " + gb(bk.used_bytes, 1) + " GB</span></div>";
+				html += '<div class="kv"' + (bk.active ? "" : ' style="opacity:.55"') + '><span class="k">' + esc(bk.name) + (bk.frozen ? " (sudah tidak live)" : "") + (bk.active ? "" : " · tidak terpakai") + '</span><span class="v">sisa ' + gbb(bk.remaining_bytes) + " · terpakai " + gbb(bk.used_bytes) + "</span></div>";
 			}
 			html += "</div>";
 		}

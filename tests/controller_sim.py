@@ -15,7 +15,7 @@ from lupa import LuaRuntime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-GB = 1_000_000_000
+GB = 1_073_741_824
 
 os.environ["BK_API_STATE"] = "/tmp/bk-api-state-test40.json"
 if os.path.exists(os.environ["BK_API_STATE"]):

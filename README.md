@@ -43,6 +43,9 @@ app ini buku catatannya. Sejak 0.4.0 satu-satunya sumber app ini adalah
   karena sisa mereka memang tidak bisa dipakai; total semua
   paket tetap ditampilkan sebagai info. Kartu Periode juga
   memuat rincian sisa + terpakai per bucket dari operator.
+- **Satuan GB mengikuti operator**: 1 GB = 2^30 byte (biner,
+  sama seperti MyXL/Sunset), supaya angka app identik dengan
+  angka operator. Bucket di bawah 1 GB tampil dalam MB.
 - **Periode** dimulai manual lewat tombol *Mulai Periode Baru* (pas
   beli dasar), tanggal mulai bisa dimundurkan; periode lama ditutup
   sebagai **snapshot permanen** di riwayat — lengkap dengan daftar
