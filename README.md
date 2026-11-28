@@ -52,6 +52,9 @@ app ini buku catatannya. Sejak 0.4.0 satu-satunya sumber app ini adalah
   bucket) − sisa sekarang. Untuk memperbaiki akumulasi warisan
   model lama; pratinjau menampilkan target dan selisihnya
   sebelum diterapkan, dan penerapannya tercatat di Status Data.
+- **Indikator memuat**: bar tipis beranimasi di atas halaman +
+  tombol Muat Ulang berubah "Memuat..." dan nonaktif selama
+  pengambilan data, supaya jelas data sedang diambil.
 - **Periode** dimulai manual lewat tombol *Mulai Periode Baru* (pas
   beli dasar), tanggal mulai bisa dimundurkan; periode lama ditutup
   sebagai **snapshot permanen** di riwayat — lengkap dengan daftar
