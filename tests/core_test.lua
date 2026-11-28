@@ -157,5 +157,30 @@ core.api_update(stf, { benefit("A", 10, 5, 1), benefit("B", 10, 5, 2) })
 core.api_update(stf, { benefit("A", 10, 4, 1) })
 near(core.usable_remaining(stf) / GB, 4, 0.001, "sisa: bucket beku (B) dikeluarkan, tinggal A 4 GB")
 
+-- ===== Koreksi terpakai satu kali (0.4.3) =====
+local stk = { offset = 0, bmap = {}, cum = {}, txs = {} }
+stk.bmap["Bonus Kuota Instagram 10GB|999"] = { total = 10 * GB, last_used = 8 * GB, acc = 65 * GB, frozen = false }
+stk.bmap["Quota Bonus 5G|888"] = { total = 100 * GB, last_used = 0, acc = 0, frozen = false }
+stk.cum["2026-11-27"] = 60 * GB
+local purch9 = {}
+for i = 1, 9 do purch9[i] = { title = "Bonus Kuota Instagram 10GB" } end
+local corr = core.correction_target(stk, purch9)
+eq(corr ~= nil, true, "koreksi: target terhitung")
+near(corr.current_bytes / GB, 65, 0.001, "koreksi: tercatat sekarang 65 GB (warisan kurang)")
+near(corr.target_bytes / GB, 88, 0.001, "koreksi: target = 9x10 - sisa 2 = 88 GB")
+near(corr.delta_bytes / GB, 23, 0.001, "koreksi: delta +23 GB")
+eq(corr.rows[1].buys, 9, "koreksi: 9 pembelian IG terklaim untuk bucket IG")
+core.apply_correction(stk, corr.delta_bytes)
+near(core.api_used(stk) / GB, 88, 0.001, "koreksi: sesudah diterapkan terpakai = 88 GB")
+near(stk.cum["2026-11-27"] / GB, 83, 0.001, "koreksi: titik kumulatif ikut bergeser rata")
+local corr2 = core.correction_target(stk, purch9)
+near(corr2.delta_bytes, 0, 0.001, "koreksi: idempoten — hitung ulang delta 0")
+local corr3 = core.correction_target(
+	{ offset = 0, cum = {}, bmap = { ["Bonus Kuota Instagram 10GB|1"] = { total = 10 * GB, last_used = 10 * GB, acc = 0, frozen = false } } },
+	{ { title = "  bonus kuota instagram 10gb " } })
+eq(corr3.rows[1].buys, 1, "koreksi: judul ternormalisasi (huruf/spasi) tetap cocok")
+eq(core.correction_target(stk, { { title = "Paket Lain Sekali" } }), nil,
+	"koreksi: tidak ada pembelian cocok -> nil")
+
 print(string.format("HASIL: %d lulus, %d gagal", pass, fail))
 TEST_FAIL = fail

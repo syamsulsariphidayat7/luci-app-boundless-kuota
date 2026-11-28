@@ -237,6 +237,96 @@ function M.bucket_list(st)
 	return list
 end
 
+-- ---------- koreksi terpakai satu kali ----------
+
+local function norm_name(s)
+	s = tostring(s or ""):lower():gsub("%s+", " ")
+	return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+-- Target terpakai menurut hitungan pembelian: untuk bucket yang
+-- punya pembelian tercatat di periode ini, total terpakainya =
+-- (jumlah pembelian x total bucket) - sisa sekarang. Itu eksak
+-- untuk paket yang selalu dibeli saat habis, dan memperbaiki
+-- akumulasi warisan model lama yang kehilangan sebagian
+-- pemakaian bucket di era transisi. Bucket tanpa pembelian
+-- mempertahankan akumulasinya apa adanya.
+-- Judul transaksi dicocokkan ke nama bucket (sama persis atau
+-- saling mengandung setelah normalisasi); tiap transaksi hanya
+-- diklaim satu bucket (nama terpanjang didahulukan).
+-- Target dihitung dari bucket SAJA (offset tidak ikut): delta
+-- diterapkan ke offset, jadi offset ditulis ulang menjadi
+-- target - total akumulasi bucket. Konsekuensinya pemakaian
+-- dari paket yang sudah tidak ada di peta paket sama sekali
+-- tidak ikut dalam target — pratinjau menampilkan target dan
+-- selisihnya sebelum diterapkan.
+-- Mengembalikan { target_bytes, current_bytes, delta_bytes,
+-- rows } atau nil bila tak ada pembelian yang cocok.
+function M.correction_target(st, purchases)
+	local buckets = {}
+	for key, e in pairs(st.bmap or {}) do
+		buckets[#buckets + 1] = {
+			name = key:match("^(.*)|[^|]*$") or key,
+			total = tonumber(e.total) or 0,
+			remaining = entry_remaining(e),
+			acc = entry_acc(e),
+			buys = 0,
+		}
+	end
+	table.sort(buckets, function(a, b) return #a.name > #b.name end)
+	local claimed, matched_any = {}, false
+	for _, b in ipairs(buckets) do
+		local bn = norm_name(b.name)
+		if #bn >= 8 then
+			for i, p in ipairs(purchases or {}) do
+				if not claimed[i] then
+					local pn = norm_name(p.title)
+					if pn ~= "" and (pn == bn
+						or bn:find(pn, 1, true) or pn:find(bn, 1, true)) then
+						claimed[i] = true
+						b.buys = b.buys + 1
+					end
+				end
+			end
+		end
+		if b.buys > 0 then matched_any = true end
+	end
+	if not matched_any then return nil end
+	local target = 0
+	local rows = {}
+	for _, b in ipairs(buckets) do
+		local tacc = b.acc
+		if b.buys > 0 then
+			tacc = b.buys * b.total - b.remaining
+			if tacc < 0 then tacc = 0 end
+			rows[#rows + 1] = {
+				name = b.name, buys = b.buys, total_bytes = b.total,
+				remaining_bytes = b.remaining, acc_bytes = b.acc,
+				target_bytes = tacc,
+			}
+		end
+		target = target + tacc
+	end
+	local current = M.api_used(st)
+	return {
+		target_bytes = target, current_bytes = current,
+		delta_bytes = target - current, rows = rows,
+	}
+end
+
+-- Terapkan koreksi: geser offset dan semua titik kumulatif
+-- harian dengan delta yang sama — selisih harian tidak berubah,
+-- kolom kumulatif naik rata.
+function M.apply_correction(st, delta)
+	delta = tonumber(delta) or 0
+	st.offset = (tonumber(st.offset) or 0) + delta
+	st.cum = st.cum or {}
+	for d, v in pairs(st.cum) do
+		st.cum[d] = (tonumber(v) or 0) + delta
+	end
+	return st
+end
+
 -- Ganti nomor aktif: total terpakai dipertahankan sebagai offset
 -- baru, peta paket disemai ulang dari daftar live nomor baru.
 function M.api_reseed(st, live)

@@ -227,6 +227,19 @@
 			</div>
 		</div>
 	</div>
+
+	<div class="modal-bg" id="bkCorrBg">
+		<div class="modal" id="bkCorrModal">
+			<h3>Koreksi Terpakai</h3>
+			<div class="hint">Menyamakan total terpakai periode ini dengan hitungan pembelian: untuk tiap paket yang dibeli berulang, terpakai = (jumlah pembelian &times; isi paket) &minus; sisa sekarang. Ini memperbaiki akumulasi warisan model lama; selisih harian tidak berubah.</div>
+			<div id="bkCorrBody"><div class="hint">Menghitung...</div></div>
+			<div class="msg" id="bkCorrMsg"></div>
+			<div class="acts">
+				<button class="btn alt" id="bkCorrCancel" type="button">Batal</button>
+				<button class="btn" id="bkCorrApply" type="button">Terapkan Koreksi</button>
+			</div>
+		</div>
+	</div>
 </div>
 
 <script>
@@ -404,7 +417,12 @@ function render(){
 		} else if (!h.api_configured) {
 			html += '<div class="lock-note amber">Sunset belum terkonfigurasi di STB ini — pasang app Sunset dan isi api_url + secret-nya dulu.</div>';
 		}
+		if (h.api_active) {
+			html += '<div style="margin-top:12px"><button class="btn alt sm" id="bkCorrBtn" type="button">Koreksi Terpakai</button></div>';
+		}
 		body.innerHTML = html;
+		var corrBtn = body.querySelector("#bkCorrBtn");
+		if (corrBtn) corrBtn.onclick = openCorrection;
 	}
 
 	renderPurchases();
@@ -582,6 +600,7 @@ function renderHealth(){
 	html += '<div class="kv"><span class="k">Ambil terakhir</span><span class="v">' + fmtDateTime(api.last_fetch) + "</span></div>";
 	var cc = a ? a.computed : null;
 	if (cc && cc.remaining_all_bytes != null) html += '<div class="kv"><span class="k">Sisa semua paket</span><span class="v">' + gb(cc.remaining_all_bytes, 1) + " GB</span></div>";
+	if (api.correction) html += '<div class="kv"><span class="k">Koreksi terpakai</span><span class="v">' + (api.correction.delta_bytes >= 0 ? "+" : "-") + gb(Math.abs(api.correction.delta_bytes), 1) + " GB · " + fmtDateTime(api.correction.at) + "</span></div>";
 	html += '<div class="hint">Data diambil segar setiap halaman ini dibuka — tidak ada cache dan tidak ada snapshot latar. Hari tanpa kunjungan menyatu ke hari kunjungan berikutnya di tabel harian.</div>';
 	body.innerHTML = html;
 }
@@ -628,6 +647,45 @@ el("bkConfirmStart").onclick = function(){
 			msg("bkPeriodMsg", "Periode baru dimulai.", true);
 		} else {
 			msg("bkStartMsg", (d && d.error) || "Gagal memulai periode.", false);
+		}
+	});
+};
+function openCorrection(){
+	el("bkCorrBody").innerHTML = '<div class="hint">Menghitung dari data segar...</div>';
+	msg("bkCorrMsg", "", true);
+	el("bkCorrModal").style.background = themeSurface();
+	el("bkCorrBg").className = "modal-bg open";
+	el("bkCorrApply").disabled = true;
+	get("correctinfo", function(st, d){
+		if (!d || !d.ok) {
+			el("bkCorrBody").innerHTML = '<div class="hint">' + esc((d && d.error) || "Gagal menghitung koreksi.") + "</div>";
+			return;
+		}
+		var c = d.correction, rows = "";
+		for (var i = 0; i < c.rows.length; i++) {
+			var r = c.rows[i];
+			rows += '<div class="kv"><span class="k">' + esc(r.name) + '</span><span class="v">' + r.buys + " pembelian &times; " + gbb(r.total_bytes) + " &minus; sisa " + gbb(r.remaining_bytes) + " = " + gbb(r.target_bytes) + "</span></div>";
+		}
+		var delta = c.delta_bytes;
+		el("bkCorrBody").innerHTML = rows +
+			'<div class="kv"><span class="k">Terpakai tercatat sekarang</span><span class="v">' + gb(c.current_bytes, 1) + ' GB</span></div>' +
+			'<div class="kv"><span class="k">Target hitungan pembelian</span><span class="v">' + gb(c.target_bytes, 1) + ' GB</span></div>' +
+			'<div class="kv"><span class="k">Koreksi</span><span class="v">' + (delta === 0 ? "tidak ada selisih" : (delta > 0 ? "+" : "-") + gb(Math.abs(delta), 1) + " GB") + "</span></div>";
+		el("bkCorrApply").disabled = delta === 0;
+	});
+}
+el("bkCorrCancel").onclick = function(){ el("bkCorrBg").className = "modal-bg"; };
+el("bkCorrBg").onclick = function(e){ if (e.target === this) this.className = "modal-bg"; };
+el("bkCorrApply").onclick = function(){
+	el("bkCorrApply").disabled = true;
+	post("correct", {}, function(st, d){
+		if (d && d.ok) {
+			el("bkCorrBg").className = "modal-bg";
+			load();
+			msg("bkPeriodMsg", "Koreksi terpakai diterapkan.", true);
+		} else {
+			msg("bkCorrMsg", (d && d.error) || "Gagal menerapkan koreksi.", false);
+			el("bkCorrApply").disabled = false;
 		}
 	});
 };

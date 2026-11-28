@@ -386,6 +386,42 @@ check(len(s["history"]) == 0, "impor: riwayat bersih lagi")
 check(s["active"]["start"] == YEST.isoformat(), "impor: active kemarin lagi")
 check(s["api"]["purchases_total"] == 38500, "impor: tercatat + override pulih Rp38.500")
 
+# 14) Koreksi terpakai: lubang warisan ditutup dari pembelian.
+_sp = os.environ["BK_API_STATE"]
+with open(_sp) as _f:
+    _st = json.load(_f)
+_st["offset"] = _st.get("offset", 0) - 5 * GB
+with open(_sp, "w") as _f:
+    json.dump(_st, _f)
+s = call_action("action_status")
+check(s["active"]["computed"]["used_bytes"] == 10 * GB,
+      "koreksi: terpakai turun ke 10 GB sesudah offset dirusak",
+      str(s["active"]["computed"]["used_bytes"]))
+ci = call_action("action_correctinfo")
+check(ci.get("ok") is True, "koreksi: pratinjau tersedia")
+corr = ci["correction"]
+check(corr["target_bytes"] == 25 * GB, "koreksi: target = hitungan pembelian 25 GB",
+      str(corr["target_bytes"]))
+check(corr["delta_bytes"] == 15 * GB, "koreksi: delta +15 GB")
+_crows = {r["name"]: r for r in corr["rows"]}
+check(_crows["Bonus Kuota Instagram 10GB"]["buys"] == 3, "koreksi: IG terhitung 3 pembelian")
+check(_crows["Bonus Kuota Instagram 10GB"]["target_bytes"] == 23 * GB,
+      "koreksi: target IG = 3x10 - sisa 7 = 23 GB")
+check(_crows["Xtra Combo Plus"]["buys"] == 1, "koreksi: XCP terhitung 1 pembelian")
+r = call_action("action_correct")
+check(r.get("ok") is True and r["used_bytes"] == 25 * GB,
+      "koreksi: terpakai menjadi 25 GB sesudah diterapkan")
+s = call_action("action_status")
+check(s["active"]["computed"]["used_bytes"] == 25 * GB, "koreksi: status konsisten 25 GB")
+check(s["api"]["correction"]["delta_bytes"] == 15 * GB, "koreksi: catatan koreksi tersimpan")
+_drows = {row["date"]: row for row in s["active"]["computed"]["daily"]}
+check(_drows[TODAY.isoformat()]["cum_bytes"] == 25 * GB, "koreksi: kumulatif hari ini 25 GB")
+check(_drows[TODAY.isoformat()]["bytes"] == 25 * GB,
+      "koreksi: satu titik tercatat — pemakaian hari ini ikut target baru")
+ci2 = call_action("action_correctinfo")
+check(ci2["correction"]["delta_bytes"] == 0, "koreksi: idempoten — delta kedua 0")
+
+
 # 15) Reset data app.
 r = call_action("action_reset")
 check(r["ok"], "reset ok", str(r))
