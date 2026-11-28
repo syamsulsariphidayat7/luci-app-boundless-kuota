@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
-"""Simulasi controller boundlesskuota di VM: stub luci.* + UCI di
-Python, vnstat --json dari database asli STB. Menguji alur PnP,
-setup wwan0, koreksi, mulai/urungkan periode, pengaturan, ekspor/impor.
+"""Simulasi controller boundlesskuota 0.4.0 di VM: stub luci.* +
+UCI di Python, backend Sunset difixture (welcome + history).
+Menguji: periode pertama, pembelian tercatat + override harga,
+akumulasi sadar-reset, keadaan basi saat API mati, tutup/urungkan
+periode (snapshot berisi daftar pembelian; override bertahan
+lintas periode), pengaturan, ekspor/impor, reset.
 """
+import datetime as _dt
 import json
 import os
-import sqlite3
 import sys
 
 from lupa import LuaRuntime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-DB = os.path.expanduser("~/workspace/user/files/vnstat.db")
+GB = 1_000_000_000
+
+os.environ["BK_API_STATE"] = "/tmp/bk-api-state-test40.json"
+if os.path.exists(os.environ["BK_API_STATE"]):
+    os.remove(os.environ["BK_API_STATE"])
 
 lua = LuaRuntime(unpack_returned_tuples=True)
 G = lua.globals()
@@ -41,35 +48,51 @@ def lua_to_py(obj):
     return obj
 
 
-# ---------------- fixture vnstat --json dari DB asli ----------------
-con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
-day_rows = list(con.execute("SELECT date,rx,tx FROM day ORDER BY date"))
-total_bytes = sum(rx + tx for _, rx, tx in day_rows)
-today_bytes = sum(rx + tx for d, rx, tx in day_rows if d == "2026-11-12")
-days_json = []
-for d, rx, tx in day_rows:
-    y, m, dd = d.split("-")
-    days_json.append({"date": {"year": int(y), "month": int(m), "day": int(dd)},
-                      "rx": rx, "tx": tx})
-vnstat_json = json.dumps({
-    "vnstatversion": "2.12",
-    "interfaces": [
-        {"name": "br-lan",
-         "updated": {"date": {"year": 2026, "month": 11, "day": 12},
-                     "time": {"hour": 12, "minute": 45}},
-         "traffic": {"day": days_json}},
-        {"name": "wwan0",
-         "updated": {"date": {"year": 2026, "month": 11, "day": 12},
-                     "time": {"hour": 12, "minute": 45}},
-         "traffic": {"day": []}},
-    ],
-})
+# ---------------- fixture backend Sunset ----------------
+TODAY = _dt.date.today()
+YEST = TODAY - _dt.timedelta(days=1)
+TOMORROW = TODAY + _dt.timedelta(days=1)
 
 
-def sys_exec(cmd):
-    if "vnstat --json" in cmd:
-        return vnstat_json
+def noon_ts(d):
+    return int(_dt.datetime(d.year, d.month, d.day, 12,
+                            tzinfo=_dt.timezone.utc).timestamp())
+
+
+WELCOME = {"ok": True, "number": "628123456", "quotas": [
+    {"name": "Xtra Combo Plus", "expired_at": 1797000000,
+     "total_bytes": 20 * GB, "remaining_bytes": 20 * GB},
+    {"name": "Bonus Kuota Instagram 10GB", "expired_at": 1796000000,
+     "total_bytes": 10 * GB, "remaining_bytes": 10 * GB},
+]}
+HISTORY = {"ok": True, "transactions": [
+    {"timestamp": noon_ts(YEST), "title": "Xtra Combo Plus", "price": 35000,
+     "status": "SUCCESS", "payment_status": "", "payment_method": "", "trx_code": "X1"},
+    {"timestamp": noon_ts(YEST), "title": "Bonus Kuota Instagram 10GB", "price": 3000,
+     "status": "SUCCESS", "payment_status": "", "payment_method": "", "trx_code": "G1"},
+    {"timestamp": noon_ts(YEST), "title": "Bonus Kuota Instagram 10GB", "price": 3000,
+     "status": "SUCCESS", "payment_status": "", "payment_method": "", "trx_code": "G2"},
+    {"timestamp": noon_ts(YEST), "title": "Reload", "price": 25000,
+     "status": "SUCCESS", "payment_status": "", "payment_method": "", "trx_code": "R1"},
+    {"timestamp": noon_ts(TODAY), "title": "Bonus Kuota Instagram 10GB", "price": 3000,
+     "status": "SUCCESS", "payment_status": "", "payment_method": "", "trx_code": "G4"},
+    {"timestamp": noon_ts(TODAY), "title": "Bonus Kuota Instagram 10GB", "price": 3000,
+     "status": "FAILED", "payment_status": "", "payment_method": "", "trx_code": "G5"},
+]}
+API_DOWN = {"welcome": False}
+
+
+def sys_exec_api(cmd):
+    if "/api/luci/welcome" in cmd:
+        return "" if API_DOWN["welcome"] else json.dumps(WELCOME)
+    if "/api/luci/history" in cmd:
+        return json.dumps(HISTORY)
     return ""
+
+
+def set_welcome(xcp_rem_gb, ig_rem_gb):
+    WELCOME["quotas"][0]["remaining_bytes"] = int(xcp_rem_gb * GB)
+    WELCOME["quotas"][1]["remaining_bytes"] = int(ig_rem_gb * GB)
 
 
 # ---------------- stub UCI ----------------
@@ -77,7 +100,9 @@ class UCI:
     def __init__(self):
         self.data = {
             "boundlesskuota": {},
-            "vnstat": {"cfg01": {".type": "vnstat", "interface": ["br-lan"]}},
+            "sunset": {"settings": {".type": "settings",
+                                    "api_url": "https://fixture.sunset",
+                                    "secret": "testsecret"}},
         }
         self.counter = 0
 
@@ -85,15 +110,24 @@ class UCI:
         return self.data.setdefault(config, {}).get(name)
 
     def get(self, config, name, option=None):
+        # Meniru libuci asli: get TANPA opsi tidak mengembalikan isi
+        # section (itu tugas get_all) — kembalikan None agar controller
+        # yang bergantung padanya ketahuan saat uji.
+        if option is None:
+            return None
         s = self._sec(config, name)
         if s is None:
             return None
-        if option is None:
-            return py_to_lua({k: v for k, v in s.items() if not k.startswith(".")})
         v = s.get(option)
         if isinstance(v, list):
             return py_to_lua(v)
         return v
+
+    def get_all(self, config, name):
+        s = self._sec(config, name)
+        if s is None:
+            return None
+        return py_to_lua({k: v for k, v in s.items() if not k.startswith(".")})
 
     def get_first(self, config, type_):
         for name, s in self.data.get(config, {}).items():
@@ -144,7 +178,7 @@ class UCI:
 
 UCI_OBJ = UCI()
 G.UCI_OBJ = UCI_OBJ
-G.SYS_EXEC = sys_exec
+G.SYS_EXEC = sys_exec_api
 G.JSON_PARSE = lambda s: py_to_lua(json.loads(s)) if s else None
 G.JSON_STRINGIFY = lambda t: json.dumps(lua_to_py(t))
 G.FORM = lua.table()
@@ -200,89 +234,153 @@ def call_action(fn, form=None):
     return json.loads(out) if out else {}
 
 
-# 1) Status awal: PnP harus mengangkat br-lan dari data pertama.
+# 1) Keadaan segar: belum ada periode.
 s = call_action("action_status")
 check(s["ok"], "status ok")
-check(s["active"]["iface"] == "br-lan", "PnP: interface br-lan", s["active"]["iface"])
-check(s["active"]["start"] == "2026-10-24", "PnP: mulai 24 Okt", s["active"]["start"])
-check(s["active"]["auto"] == "1", "PnP: auto=1")
+check(s.get("active") is None, "awal: belum ada periode aktif")
+check(s["health"]["has_active"] is False, "awal: health tanpa periode")
+check(s["settings"]["days"] == "28", "awal: masa aktif bawaan 28 hari")
+check(len(s["history"]) == 0, "awal: riwayat kosong")
+
+# 2) Tanggal masa depan ditolak; periode pertama dibuat (mundur 1 hari).
+r = call_action("action_start", {"date": TOMORROW.isoformat(), "days": "28"})
+check(not r["ok"], "start: tanggal masa depan ditolak")
+r = call_action("action_start", {"date": YEST.isoformat(), "days": "28"})
+check(r["ok"], "start: periode pertama dibuat", str(r))
+
+# 3) Status: API aktif, pembelian jendela periode terbaca penuh.
+s = call_action("action_status")
+check(s["health"]["api_active"] is True, "api: terhubung")
 c = s["active"]["computed"]
-check(c["used_bytes"] == total_bytes, "status: used = total DB", c["used_bytes"])
-check(c["blocks"] == 33, "status: 33 blok", c["blocks"])
-check(c["paid"] == 129000, "status: Rp129.000", c["paid"])
-check(c["day_number"] == 20, "status: hari ke-20", c["day_number"])
-check(len(s["history"]) == 0, "status: riwayat kosong")
-check(s["health"]["wwan_monitored"] is False, "status: wwan0 belum dimonitor")
-check(s["health"]["updated"] == "2026-11-12 12:45", "status: updated vnStat", s["health"]["updated"])
+check(c["used_bytes"] == 0, "api: terpakai awal 0")
+check(c["remaining_bytes"] == 30 * GB, "api: sisa operator = jumlah semua paket",
+      str(c["remaining_bytes"]))
+check(s["api"]["purchases_count"] == 4, "api: 4 pembelian SUCCESS paket (Reload+FAILED tersaring)",
+      str(s["api"].get("purchases_count")))
+check(s["api"]["purchases_total"] == 44000, "api: total tercatat Rp44.000",
+      str(s["api"].get("purchases_total")))
+check(c["purchases_total"] == 44000, "api: headline biaya = tercatat")
+check(c["day_number"] == 2, "api: hari ke-2", str(c["day_number"]))
 
-# 2) Setup wwan0 menambahkan ke config vnstat.
-r = call_action("action_setup")
-check(r["ok"], "setup ok")
+# 4) Override harga riil XCP 35.000 -> 30.000.
+r = call_action("action_txprice", {"key": "c:X1", "price": "30000"})
+check(r["ok"], "txprice: override tersimpan", str(r))
 s = call_action("action_status")
-check(s["health"]["wwan_monitored"] is True, "setup: wwan0 kini dimonitor")
+check(s["api"]["purchases_total"] == 39000, "txprice: total jadi Rp39.000",
+      str(s["api"].get("purchases_total")))
+_it = [p for p in s["api"]["purchases"] if p.get("key") == "c:X1"]
+check(len(_it) == 1 and _it[0]["price"] == 30000 and _it[0].get("overridden") is True,
+      "txprice: baris XCP bertanda override")
 
-# 3) Koreksi +1 lalu -1.
-call_action("action_correct", {"delta": "1"})
+# 5-8) Pertumbuhan + reset bucket IG (beli saat habis, tidak menumpuk).
+set_welcome(20, 6)
 s = call_action("action_status")
-check(s["active"]["computed"]["paid"] == 132000, "koreksi +1: Rp132.000", s["active"]["computed"]["paid"])
-call_action("action_correct", {"delta": "-1"})
+check(s["active"]["computed"]["used_bytes"] == 4 * GB, "reset: IG terpakai 4 GB")
+set_welcome(20, 0)
 s = call_action("action_status")
-check(s["active"]["computed"]["paid"] == 129000, "koreksi -1: kembali Rp129.000")
+check(s["active"]["computed"]["used_bytes"] == 10 * GB, "reset: IG habis = 10 GB")
+set_welcome(20, 10)
+s = call_action("action_status")
+check(s["active"]["computed"]["used_bytes"] == 10 * GB,
+      "reset: sesudah beli lagi total tetap 10 GB (bukan 0, bukan 20)")
+set_welcome(18, 7)
+s = call_action("action_status")
+c = s["active"]["computed"]
+check(c["used_bytes"] == 15 * GB, "reset: XCP +2 & IG bucket baru +3 = 15 GB",
+      str(c["used_bytes"]))
+check(abs(c["price_per_gb"] - 2600) < 1, "harga/GB efektif = 39.000/15 = Rp2.600",
+      str(c["price_per_gb"]))
+check(c["remaining_bytes"] == 25 * GB, "sisa operator kini 25 GB")
 
-# 4) Ekspor di keadaan bersih.
-call_action("action_export")
-exp = json.loads(G.HTTP_OUT)
-check(exp["app"] == "boundless-kuota", "ekspor: app benar")
-check(exp["active"]["start"] == "2026-10-24", "ekspor: active 24 Okt")
+# 9) Tabel harian: biaya mengikuti tanggal beli riil.
+rows = {r["date"]: r for r in c["daily"]}
+check(rows[YEST.isoformat()]["cost"] == 36000, "harian: biaya kemarin Rp36.000 (XCP override + 2 IG)",
+      str(rows[YEST.isoformat()]))
+check(rows[YEST.isoformat()]["bytes"] == 0, "harian: kemarin tanpa catatan pemakaian (state lahir hari ini)")
+check(rows[TODAY.isoformat()]["bytes"] == 15 * GB, "harian: pemakaian menumpuk di hari ambil")
+check(rows[TODAY.isoformat()]["cost"] == 3000, "harian: biaya hari ini Rp3.000 (G4)")
+check(rows[TODAY.isoformat()]["cum_cost"] == 39000, "harian: biaya kumulatif Rp39.000")
+check(abs(rows[TODAY.isoformat()]["price_per_gb"] - 2600) < 1, "harian: harga/GB kumulatif Rp2.600")
 
-# 5) Mulai periode baru hari ini: snapshot anti dobel hitung.
-r = call_action("action_start", {"date": "2026-11-12", "opening_blocks": "0"})
-check(r["ok"], "start ok", str(r))
+# 10) API mati: angka terakhir tampil apa adanya, ditandai basi.
+API_DOWN["welcome"] = True
 s = call_action("action_status")
-check(len(s["history"]) == 1, "start: 1 snapshot")
+check(s["health"]["api_stale"] is True, "basi: ditandai saat API mati")
+check(s["health"]["api_active"] is False, "basi: api tidak aktif")
+check(s["active"]["computed"]["used_bytes"] == 15 * GB, "basi: terpakai terakhir dipertahankan")
+check(s["api"]["purchases_total"] == 39000, "basi: tercatat terakhir dipertahankan")
+check(s["api"]["last_fetch"] is not None, "basi: ada cap waktu ambil terakhir")
+API_DOWN["welcome"] = False
+
+# 11) Pengaturan: hanya masa aktif.
+r = call_action("action_settings", {"days": "30"})
+check(r["ok"], "settings: 30 hari ok")
+r = call_action("action_settings", {"days": "0"})
+check(not r["ok"], "settings: 0 hari ditolak")
+s = call_action("action_status")
+check(s["settings"]["days"] == "30", "settings: tersimpan 30")
+
+# 11b) Override transaksi hari ini (G4) — harus bertahan lintas periode.
+r = call_action("action_txprice", {"key": "c:G4", "price": "2500"})
+check(r["ok"], "txprice: override G4 ok")
+s = call_action("action_status")
+check(s["api"]["purchases_total"] == 38500, "txprice: total berjalan Rp38.500")
+
+# 12) Tutup periode hari ini: snapshot = pembelian di jendela lama.
+r = call_action("action_start", {"date": TODAY.isoformat()})
+check(r["ok"], "tutup: periode baru dimulai", str(r))
+s = call_action("action_status")
+check(len(s["history"]) == 1, "tutup: 1 snapshot")
 h = s["history"][0]
-exp_used = total_bytes - today_bytes
-check(h["used_bytes"] == exp_used, "snapshot: used tanpa hari ini", f'{h["used_bytes"]} vs {exp_used}')
-check(h["paid"] == 126000, "snapshot: 32 blok = Rp126.000", h["paid"])
-check(h["duration_days"] == 19, "snapshot: durasi 19 hari", h["duration_days"])
-check(abs(h["hangus_bytes"] - (320_000_000_000 - exp_used)) < 1, "snapshot: hangus 2,88 GB")
-check(s["active"]["iface"] == "wwan0", "start: periode baru wwan0", s["active"]["iface"])
-check(s["active"]["computed"]["used_bytes"] == 0, "start: wwan0 mulai bersih")
-check(s["can_undo"] is True, "start: bisa urungkan")
-check(s["totals"]["paid"] == 126000 + 30000, "total: snapshot + dasar periode baru", s["totals"]["paid"])
+check(h["paid"] == 36000, "snapshot: biaya = pembelian tercatat jendela lama Rp36.000",
+      str(h["paid"]))
+check(h["purchases_count"] == 3, "snapshot: 3 pembelian tersimpan")
+check(len(h.get("purchases") or []) == 3, "snapshot: daftar pembelian permanen ikut")
+check(h["used_bytes"] == 15 * GB, "snapshot: terpakai s/d penutupan 15 GB",
+      str(h["used_bytes"]))
+check(h["duration_days"] == 1, "snapshot: durasi 1 hari")
+check(s["can_undo"] is True, "tutup: bisa urungkan")
+check(s["active"]["start"] == TODAY.isoformat(), "tutup: periode baru mulai hari ini")
+check(s["active"]["days"] == 30, "tutup: periode baru memakai masa aktif tersimpan (30)")
+c = s["active"]["computed"]
+check(c["used_bytes"] == 0, "periode baru: terpakai mulai 0")
+check(c["purchases_total"] == 2500, "periode baru: G4 hari ini + override bertahan = Rp2.500",
+      str(c["purchases_total"]))
+check(s["totals"]["paid"] == 38500, "total keseluruhan konsisten Rp38.500",
+      str(s["totals"]["paid"]))
 
-# 6) Urungkan: semua kembali persis.
+# 13) Urungkan: semua kembali persis.
 r = call_action("action_undo")
 check(r["ok"], "undo ok")
 s = call_action("action_status")
 check(len(s["history"]) == 0, "undo: snapshot prematur terhapus")
-check(s["active"]["iface"] == "br-lan", "undo: kembali br-lan")
-check(s["active"]["computed"]["paid"] == 129000, "undo: kembali Rp129.000")
+check(s["active"]["start"] == YEST.isoformat(), "undo: periode lama aktif lagi")
+check(s["api"]["purchases_total"] == 38500, "undo: tercatat kembali Rp38.500")
 check(s["can_undo"] is False, "undo: can_undo mati")
 
-# 7) Pengaturan paket langsung + periode baru memakainya.
-r = call_action("action_settings", {
-    "mode": "langsung", "base": "30000", "block_gb": "10", "block_rp": "3000",
-    "days": "30", "direct_rp": "75000", "direct_gb": "200", "next_iface": "wwan0"})
-check(r["ok"], "settings ok", str(r))
-call_action("action_start", {"date": "2026-11-12", "opening_blocks": "0"})
-s = call_action("action_status")
-check(s["active"]["mode"] == "langsung", "periode baru: mode langsung")
-check(s["active"]["computed"]["paid"] == 75000, "periode baru: Rp75.000")
-call_action("action_undo")
-
-# 8) Impor cadangan memulihkan keadaan bersih.
-call_action("action_start", {"date": "2026-11-12", "opening_blocks": "0"})
+# 14) Ekspor -> tutup lagi -> impor memulihkan.
+call_action("action_export")
+exp = json.loads(G.HTTP_OUT)
+check(exp["app"] == "boundless-kuota", "ekspor: app benar")
+check(exp["active"]["start"] == YEST.isoformat(), "ekspor: active kemarin")
+check(exp.get("api_state") is not None, "ekspor: keadaan API ikut")
+call_action("action_start", {"date": TODAY.isoformat()})
 s = call_action("action_status")
 check(len(s["history"]) == 1, "pra-impor: ada snapshot")
 r = call_action("action_import", {"data": json.dumps(exp)})
 check(r["ok"], "impor ok", str(r))
 s = call_action("action_status")
 check(len(s["history"]) == 0, "impor: riwayat bersih lagi")
-check(s["active"]["iface"] == "br-lan", "impor: active br-lan lagi")
-check(s["active"]["mode"] == "blok", "impor: skema blok lagi")
-check(s["settings"]["mode"] == "blok", "impor: settings blok lagi")
-check(s["active"]["computed"]["paid"] == 129000, "impor: Rp129.000 lagi")
+check(s["active"]["start"] == YEST.isoformat(), "impor: active kemarin lagi")
+check(s["api"]["purchases_total"] == 38500, "impor: tercatat + override pulih Rp38.500")
+
+# 15) Reset data app.
+r = call_action("action_reset")
+check(r["ok"], "reset ok", str(r))
+s = call_action("action_status")
+check(s.get("active") is None, "reset: tidak ada periode")
+check(len(s["history"]) == 0, "reset: riwayat kosong")
+check(s["can_undo"] is False, "reset: tidak bisa urungkan")
 
 print(f"HASIL SIMULASI: {passed} lulus, {failed} gagal")
 sys.exit(0 if failed == 0 else 1)

@@ -1,59 +1,53 @@
 # luci-app-boundless-kuota
 
-App LuCI untuk memonitor kuota internet GSM (modem di STB OpenWrt)
-berdasarkan traffic asli yang lewat STB. Menu: **Services → Monitoring Kuota**.
+App LuCI untuk mencatat **biaya internet GSM per periode** (modem di
+STB OpenWrt), dari angka resmi operator. Menu: **Services → Monitoring Kuota**.
 
 Beda dengan Sunset: Sunset adalah panel transaksinya (OTP, beli paket),
-app ini panel monitoringnya. Sejak 0.3.0 sumber utama app ini adalah
-**angka resmi operator** dari backend Sunset; vnStat yang sudah berjalan
-di firmware menjadi pembanding + cadangan otomatis — app tidak pernah
-menulis ke database vnStat.
+app ini buku catatannya. Sejak 0.4.0 satu-satunya sumber app ini adalah
+**API Sunset** — vnStat tidak lagi dibaca sama sekali.
 
 ## Cara kerja
 
-- **Sumber API Sunset (utama, 0.3.0):** config dipinjam dari app Sunset
-  di STB yang sama (`uci sunset.settings`). Terpakai + sisa per paket
-  dari `GET /api/luci/welcome` dengan model baseline + beku: paket yang
-  kedaluwarsa/hilang dibekukan pada nilai terakhirnya, paket baru
-  baseline-nya 0, ganti nomor mempertahankan total sebagai offset.
-  Pembelian resmi XL (semua kanal, status SUCCESS) dari
-  `GET /api/luci/history` diakumulasi lokal (dedupe per transaksi) dan
-  ditampilkan sebagai bukti pembanding di kartu *Pembelian Tercatat* —
-  biaya utama tetap rumus skema. Cron snapshot tiap 30 menit
-  (`/usr/bin/boundlesskuota-snapshot`) menjaga kumulatif harian +
-  akumulasi riwayat walau dashboard tidak dibuka. Keadaan API disimpan
-  di `/etc/boundlesskuota-api.json` (ikut ekspor/impor cadangan).
-- **Cadangan vnStat:** API tak terjangkau → app jatuh ke pembacaan
-  `vnstat --json` (harian) untuk interface sumber periode, termasuk
-  model jangkar sinkron manual 0.2.x (sinkron manual ditolak selama
-  API aktif). Migrasi pertama ke API memakai terpakai efektif
-  akuntansi vnStat/jangkar sebagai offset + menyemai kumulatif harian
-  dari riwayat vnStat, jadi dashboard tidak meloncat.
-- **Periode** dimulai manual lewat tombol *Mulai Periode Baru* (pas beli
-  dasar), tanggal mulai bisa dimundurkan; periode lama ditutup sebagai
-  **snapshot permanen** di riwayat.
-- **Model biaya auto-blok** (bawaan): biaya dasar Rp30.000/28 hari +
-  top-up Rp3.000 per blok 10 GB. Blok terbeli disimpulkan otomatis dari
-  pemakaian: `ceil(terpakai / 10 GB)` — tanpa input manual per top-up.
-  Ada juga mode *Paket Langsung* (sekali beli, mis. Rp50.000/30 hari).
-- GB selalu **desimal** (byte / 1e9), mengikuti cara operator menghitung.
-- Skema + interface **dibekukan per periode**; perubahan di Pengaturan
-  berlaku mulai periode berikutnya.
-- Salah pencet periode baru bisa **diurungkan** (periode sebelumnya
-  aktif lagi persis seperti semula, snapshot prematur dihapus).
-- **Ekspor/Impor Cadangan** JSON untuk riwayat + periode + pengaturan
-  app (tidak termasuk database vnStat).
-
-## Interface & PnP
-
-- Pasang pertama: app otomatis memakai **br-lan** untuk periode pertama
-  bila vnStat sudah punya datanya (arah RX/TX dibalik: tx br-lan =
-  download internet), sekaligus installer mengaktifkan monitoring
-  **wwan0** (interface modem beneran).
-- Periode berikutnya otomatis memakai **wwan0** (bawaan Pengaturan) —
-  data modem yang bersih, mulai tercatat sejak hari aktivasi.
-- Sisa kuota adalah perkiraan dari traffic yang lewat STB ini, bukan
-  angka resmi operator; angka vnStat tersimpan berkala (±5 menit).
+- **Sumber API Sunset:** config dipinjam dari app Sunset di STB yang
+  sama (`uci sunset.settings`). Terpakai + sisa per paket dari
+  `GET /api/luci/welcome`; pembelian resmi XL (semua kanal, status
+  SUCCESS) dari `GET /api/luci/history`, diakumulasi lokal (dedupe
+  per transaksi) di `/etc/boundlesskuota-api.json`.
+- **Segar tiap dibuka, tanpa snapshot latar:** data diambil langsung
+  setiap dashboard dimuat — tidak ada cache dan tidak ada cron.
+  Keadaan hanya diperbarui saat halaman dibuka; hari tanpa kunjungan
+  menyatu ke hari kunjungan berikutnya di tabel harian. Bila API
+  tidak terjangkau, dashboard menampilkan data terakhir yang
+  tersimpan apa adanya, ditandai basi.
+- **Biaya tercatat adalah angka utama:** headline periode berjalan =
+  total pembelian tercatat dalam jendela periode, dengan **harga
+  riil** — koreksi per transaksi (tombol ✎) menimpa harga katalog XL
+  (mis. Xtra Combo Plus katalog Rp35.000 dibayar Rp30.000). Reload /
+  isi pulsa **tidak** dihitung: itu pendanaan, bukan pembelian.
+  Koreksi harga bertahan lintas periode.
+- **Pemakaian harian sadar-reset:** paket add-on (mis. Bonus Kuota
+  Instagram 10GB) tidak menumpuk — membeli lagi me-reset bucket ke
+  penuh dan sisa lama hangus. Akumulasi membaca penurunan besar
+  terpakai bucket sebagai reset (bucket lama dikreditkan habis
+  penuh), jadi total terpakai tetap eksak untuk kebiasaan membeli
+  saat bucket habis. Paket yang hilang dari daftar operator
+  dibekukan pada akumulasi terakhirnya.
+- **Harga/GB efektif** = total biaya tercatat ÷ total terpakai
+  operator — tersedia sebagai angka periode dan per hari (kumulatif)
+  di tabel harian, bersama biaya riil per tanggal pembelian.
+- **Sisa** yang ditampilkan adalah sisa operator langsung (jumlah
+  sisa semua paket live di welcome), bukan hasil rumus.
+- **Periode** dimulai manual lewat tombol *Mulai Periode Baru* (pas
+  beli dasar), tanggal mulai bisa dimundurkan; periode lama ditutup
+  sebagai **snapshot permanen** di riwayat — lengkap dengan daftar
+  pembeliannya, jadi biaya tiap periode tercatat selamanya walau
+  riwayat XL sudah tidak menjangkaunya. Salah pencet bisa
+  **diurungkan**.
+- **Ekspor/Impor Cadangan** JSON untuk riwayat + periode +
+  pengaturan + keadaan API.
+- GB selalu **desimal** (byte / 1e9), mengikuti cara operator
+  menghitung kuota.
 
 ## Pasang
 
@@ -64,6 +58,10 @@ curl -fsSL https://raw.githubusercontent.com/syamsulsariphidayat7/luci-app-bound
 ```
 
 Atau dari salinan lokal repo ini: `sh install.sh` (di dalam STB).
+Update ke 0.4.0 otomatis menghapus cron snapshot + berkas snapshot
+warisan ≤0.3.x; keadaan API (akumulasi pembelian, kumulatif harian,
+koreksi harga) diteruskan apa adanya — periode yang sedang berjalan
+tidak terganggu.
 
 ## Copot
 
@@ -72,16 +70,13 @@ sh /root/luci-app-boundless-kuota-uninstall.sh        # config dipertahankan
 sh /root/luci-app-boundless-kuota-uninstall.sh purge  # config ikut dihapus
 ```
 
-Monitoring wwan0 di vnStat tidak dimatikan saat copot (data vnStat
-milik sistem).
-
 ## Uji
 
-Inti perhitungan adalah Lua murni (`boundlesskuota_core.lua`) dan diuji
-di luar STB memakai fixture database vnStat asli + skenario batas:
+Inti perhitungan adalah Lua murni (`boundlesskuota_core.lua`);
+simulasi controller memakai stub UCI + fixture backend Sunset:
 
 ```sh
 pip install lupa
 python3 tests/run_tests.py
-python3 tests/controller_sim.py  # simulasi controller (stub UCI + vnStat asli)
+python3 tests/controller_sim.py
 ```

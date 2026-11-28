@@ -37,10 +37,6 @@
 .bk-wrap .btn:disabled{opacity:.5;cursor:default}
 .bk-wrap .banner{display:none;border:1px solid rgba(217,119,6,.55);background:rgba(251,191,36,.13);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:12px 0}
 .bk-wrap .banner.show{display:block}
-.bk-wrap .setup-card{display:none;border:1px solid rgba(34,211,238,.55);background:rgba(34,211,238,.09);border-radius:14px;padding:16px 18px;margin:0 0 16px}
-.bk-wrap .setup-card.show{display:block}
-.bk-wrap .setup-card h2{margin:0 0 6px;font-size:16px;border:none;padding:0}
-.bk-wrap .setup-card p{margin:0 0 12px;font-size:13.5px;opacity:.85}
 .bk-wrap .grid{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
 @media(max-width:900px){.bk-wrap .grid{grid-template-columns:1fr}}
 .bk-wrap .card{background:rgba(127,127,127,.06);border:1px solid rgba(127,127,127,.25);border-radius:14px;padding:18px;margin-bottom:16px}
@@ -52,10 +48,6 @@
 .bk-wrap .cost-line .lbl{opacity:.65}
 .bk-wrap .cost-line b{display:block;font-size:19px}
 .bk-wrap .cost-line .sub{display:block;font-size:12.5px;opacity:.75}
-.bk-wrap .blok-line{font-size:14px}
-.bk-wrap .blok-line .lbl{opacity:.65}
-.bk-wrap .blok-line b{display:block;font-size:19px}
-.bk-wrap .blok-line .sub{display:block;font-size:12.5px;opacity:.75}
 .bk-wrap .bar{height:12px;border-radius:999px;background:rgba(127,127,127,.22);overflow:hidden;margin:12px 0 6px}
 .bk-wrap .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--cyan))}
 .bk-wrap .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
@@ -65,7 +57,6 @@
 .bk-wrap .lock-note{display:flex;gap:8px;align-items:flex-start;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.45);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-top:14px}
 .bk-wrap .lock-note.amber{background:rgba(251,191,36,.13);border-color:rgba(217,119,6,.5)}
 .bk-wrap .corr{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
-.bk-wrap .corr .lbl{font-size:13px}
 .bk-wrap .chart{display:flex;align-items:flex-end;gap:8px;height:120px;margin-top:10px;overflow:hidden}
 @media(max-width:640px){.bk-wrap .chart{gap:5px}}
 .bk-wrap .chart .col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
@@ -80,6 +71,7 @@
 .bk-wrap tr.today-row td{font-weight:700}
 .bk-wrap tr.total-row td{font-weight:800;border-top:2px solid rgba(127,127,127,.4)}
 .bk-wrap tr.older-row{display:none}
+.bk-wrap tr.detail-row td{font-size:12.5px;opacity:.85;background:rgba(127,127,127,.05)}
 .bk-wrap .pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:11px;font-weight:700}
 .bk-wrap .pill.run{background:rgba(34,197,94,.16);border:1px solid rgba(34,197,94,.55)}
 .bk-wrap .pill.done{background:rgba(127,127,127,.14);border:1px solid rgba(127,127,127,.35)}
@@ -90,8 +82,6 @@
 .bk-wrap .status-warn{color:var(--amber);font-weight:700}
 .bk-wrap label.f{display:block;font-size:12.5px;opacity:.72;margin:10px 0 4px}
 .bk-wrap select.f,.bk-wrap input.f,.bk-wrap textarea.f{width:100%;max-width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(127,127,127,.45);background:transparent;color:inherit;font:inherit;font-size:13.5px}
-.bk-wrap input.f.sm-in{width:96px;display:inline-block;padding:5px 8px}
-.bk-wrap .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .bk-wrap .foot{font-size:12px;opacity:.6;margin-top:4px}
 .bk-wrap .modal-bg{display:none;position:fixed;inset:0;background:rgba(2,6,12,.66);z-index:1200;align-items:flex-start;justify-content:center;padding:40px 14px}
 .bk-wrap .modal-bg.open{display:flex}
@@ -117,12 +107,6 @@
 
 	<div class="banner" id="bkBanner"></div>
 
-	<div class="setup-card" id="bkSetupCard">
-		<h2>Aktifkan Monitoring Modem (wwan0)</h2>
-		<p>vnStat belum mencatat <b>wwan0</b>. Aktifkan agar periode berikutnya memakai data modem; periode berjalan tidak berubah.</p>
-		<button class="btn" id="bkSetupBtn" type="button">Aktifkan Monitoring wwan0</button>
-	</div>
-
 	<div class="grid">
 		<div>
 			<div class="card">
@@ -133,6 +117,11 @@
 					<button class="btn alt sm" id="bkUndoBtn" type="button" style="width:100%;margin-top:8px">Urungkan Periode Baru</button>
 				</div>
 				<div class="msg" id="bkPeriodMsg"></div>
+			</div>
+
+			<div class="card">
+				<h2>Pembelian Tercatat (XL)</h2>
+				<div id="bkPurchBody"><div class="hint">Memuat...</div></div>
 			</div>
 
 			<div class="card">
@@ -147,8 +136,8 @@
 				<table>
 					<thead><tr>
 						<th>Tanggal</th><th class="r">Terpakai</th><th class="r">Kumulatif</th>
-						<th class="r">Blok</th><th class="r">Biaya/Hari</th>
-						<th class="r">Nilai Terpakai/Hari</th><th class="r">Biaya Kumulatif</th>
+						<th class="r">Biaya/Hari</th><th class="r">Biaya Kumulatif</th>
+						<th class="r">Harga/GB</th>
 					</tr></thead>
 					<tbody id="bkDailyBody"></tbody>
 				</table>
@@ -162,12 +151,12 @@
 				<table>
 					<thead><tr>
 						<th>Periode</th><th class="r">Durasi</th><th class="r">Terpakai</th>
-						<th class="r">Total Biaya</th><th class="r">Hangus</th>
+						<th class="r">Total Biaya</th>
 					</tr></thead>
 					<tbody id="bkHistoryBody"></tbody>
 				</table>
 				</div>
-				<div class="hint">Periode tertutup = snapshot permanen.</div>
+				<div class="hint">Periode tertutup = snapshot permanen, lengkap dengan daftar pembeliannya (tap Rincian).</div>
 				<div class="corr">
 					<a class="btn alt sm" id="bkExportBtn" href="#">Ekspor Cadangan</a>
 					<button class="btn alt sm" id="bkImportToggle" type="button">Impor Cadangan</button>
@@ -188,8 +177,8 @@
 
 		<div>
 			<div class="card">
-				<h2>Proyeksi</h2>
-				<div id="bkCostBody"><div class="hint">Memuat...</div></div>
+				<h2>Perkiraan Biaya</h2>
+				<div id="bkSpendBody"><div class="hint">Memuat...</div></div>
 			</div>
 
 			<div class="card">
@@ -198,43 +187,11 @@
 			</div>
 
 			<div class="card">
-				<h2>Pembelian Tercatat (XL)</h2>
-				<div id="bkPurchBody"><div class="hint">Memuat...</div></div>
-			</div>
-
-			<div class="card">
-				<h2>Pengaturan — Untuk Periode Berikutnya</h2>
-				<div class="lock-note" id="bkLockNote"></div>
-				<label class="f">Mode skema</label>
-				<select class="f" id="bkSetMode">
-					<option value="blok">Blok (dasar + top-up per blok)</option>
-					<option value="langsung">Paket langsung (sekali beli)</option>
-				</select>
-				<div id="bkSetBlok">
-					<div class="row2">
-						<div><label class="f">Biaya dasar (Rp)</label><input class="f" id="bkSetBase" type="number" min="0"></div>
-						<div><label class="f">Masa aktif (hari)</label><input class="f" id="bkSetDays" type="number" min="1" max="366"></div>
-					</div>
-					<div class="row2">
-						<div><label class="f">Ukuran blok (GB)</label><input class="f" id="bkSetBlockGb" type="number" min="1"></div>
-						<div><label class="f">Harga per blok (Rp)</label><input class="f" id="bkSetBlockRp" type="number" min="0"></div>
-					</div>
-				</div>
-				<div id="bkSetDirect" style="display:none">
-					<div class="row2">
-						<div><label class="f">Harga paket (Rp)</label><input class="f" id="bkSetDirectRp" type="number" min="0"></div>
-						<div><label class="f">Masa aktif (hari)</label><input class="f" id="bkSetDays2" type="number" min="1" max="366"></div>
-					</div>
-					<label class="f">Kuota paket (GB, 0 = tanpa batas)</label>
-					<input class="f" id="bkSetDirectGb" type="number" min="0">
-				</div>
-				<label class="f">Interface periode berikutnya</label>
-				<select class="f" id="bkSetIface">
-					<option value="wwan0">wwan0 (bawaan app · modem)</option>
-					<option value="br-lan">br-lan (arah dibalik)</option>
-				</select>
-				<div class="hint">Periode berjalan terkunci; pilihan ini untuk periode berikutnya.</div>
-				<button class="btn" id="bkSetSave" type="button" style="width:100%;margin-top:12px">Simpan untuk Periode Berikutnya</button>
+				<h2>Pengaturan</h2>
+				<label class="f">Masa aktif periode berikutnya (hari)</label>
+				<input class="f" id="bkSetDays" type="number" min="1" max="366">
+				<div class="hint">Harga dan kuota dibaca otomatis dari XL — tidak ada skema manual lagi. Koreksi harga per transaksi lewat tombol &#9998; di daftar Pembelian Tercatat.</div>
+				<button class="btn" id="bkSetSave" type="button" style="width:100%;margin-top:12px">Simpan</button>
 				<div class="msg" id="bkSetMsg"></div>
 			</div>
 
@@ -252,7 +209,7 @@
 		</div>
 	</div>
 
-	<div class="foot" id="bkFoot">Data vnStat STB (±5 menit). Sisa kuota = perkiraan dari traffic STB, bukan angka resmi operator.</div>
+	<div class="foot" id="bkFoot">Data dari API Sunset (operator XL), diambil segar setiap halaman dibuka. Biaya = pembelian tercatat dengan harga riil.</div>
 
 	<div class="modal-bg" id="bkModalBg">
 		<div class="modal" id="bkModal">
@@ -261,9 +218,8 @@
 			<div class="banner show" id="bkModalSummary" style="display:block"></div>
 			<label class="f">Tanggal mulai periode baru</label>
 			<input class="f" type="date" id="bkStartDate">
-			<label class="f">Blok sudah terbeli (opsional, bawaan 0)</label>
-			<input class="f" type="number" id="bkOpening" min="0" value="0">
-			<div class="hint">Isi bila mulai di tengah periode dan sebagian blok sudah terbeli.</div>
+			<label class="f">Masa aktif (hari)</label>
+			<input class="f" type="number" id="bkStartDays" min="1" max="366">
 			<div class="msg" id="bkStartMsg"></div>
 			<div class="acts">
 				<button class="btn alt" id="bkCancelStart" type="button">Batal</button>
@@ -282,6 +238,7 @@ var GB = 1000000000;
 var MONTHS = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 var state = null;
 var dailyExpanded = false;
+var histOpen = {};
 
 function el(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -295,6 +252,12 @@ function fmtDate(iso){
 	var p = iso.split("-");
 	if (p.length !== 3) return iso;
 	return Number(p[2]) + " " + (MONTHS[Number(p[1]) - 1] || "") + " " + p[0];
+}
+function fmtDateTime(epoch){
+	if (!epoch) return "-";
+	var d = new Date(epoch * 1000);
+	return d.getDate() + " " + (MONTHS[d.getMonth()] || "") + " " + d.getFullYear() + " " +
+		("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
 }
 function msg(id, text, ok){
 	var m = el(id);
@@ -370,142 +333,117 @@ function themeButtons(){
 		}
 	}
 }
-function schemeText(a){
-	if (!a) return "";
-	if (a.mode === "langsung") {
-		return "Paket langsung " + rp(a.direct_rp) + " · " + a.days + " hari · " +
-			(a.direct_gb > 0 ? a.direct_gb + " GB" : "tanpa batas") + " · " + a.iface;
-	}
-	return "Dasar " + rp(a.base) + " · " + a.days + " hari · Blok " + a.block_gb +
-		" GB/" + rp(a.block_rp) + " · " + a.iface;
-}
 
 function render(){
 	if (!state) return;
 	var a = state.active, c = a ? a.computed : null, h = state.health || {};
-	var apiOn = !!(state.api && state.api.active);
-	if (apiOn && state.api.last_fetch) {
-		var lf = new Date(state.api.last_fetch * 1000);
-		var lfs = ("0" + lf.getHours()).slice(-2) + ":" + ("0" + lf.getMinutes()).slice(-2);
-		el("bkUpdated").textContent = "API Sunset terakhir: " + lfs + " WIB";
-	} else {
-		el("bkUpdated").textContent = h.updated ? ("vnStat terakhir: " + h.updated.replace(" ", " · ") + " WIB") : "";
-	}
-	el("bkFoot").textContent = apiOn
-		? "Data dari API Sunset — terpakai, sisa, dan pembelian adalah angka resmi operator XL. vnStat hanya pembanding."
-		: "Data vnStat STB (±5 menit). Sisa kuota = perkiraan dari traffic STB, bukan angka resmi operator.";
+	var api = state.api || {};
+
+	el("bkUpdated").textContent = api.last_fetch
+		? ((h.api_stale ? "Data terakhir: " : "Data diambil: ") + fmtDateTime(api.last_fetch) + " WIB")
+		: "";
 
 	// Banner peringatan
 	var banner = "";
-	if (!h.vnstat_ok && !apiOn) banner = "vnStat tidak bisa dibaca di STB ini. Pastikan paket vnstat terpasang dan vnstatd berjalan.";
-	else if (a && h.active_monitored === false) banner = "Interface " + esc(a.iface) + " belum dimonitor vnStat — belum ada data. Aktifkan lewat tombol setup atau tunggu vnStat mulai mencatat.";
+	if (a && !h.api_configured) banner = "App Sunset belum terkonfigurasi di STB ini (api_url / secret kosong) — belum ada data yang bisa dibaca.";
+	else if (a && h.api_stale) banner = "API Sunset tidak terjangkau — menampilkan data terakhir yang tersimpan. Pembelian dan pemakaian sesudahnya belum tercatat di sini.";
 	else if (c && c.expired) banner = "Periode berakhir — menunggu periode baru. Beli dasar baru, lalu tap Mulai Periode Baru.";
 	el("bkBanner").textContent = banner;
 	el("bkBanner").className = "banner" + (banner ? " show" : "");
 
-	// Kartu setup wwan0
-	el("bkSetupCard").className = "setup-card" + (!h.wwan_monitored ? " show" : "");
-
 	// Periode berjalan
 	var body = el("bkPeriodBody");
 	if (!a || !c) {
-		body.innerHTML = '<div class="hint">Belum ada periode aktif.</div>';
+		body.innerHTML = '<div class="hint">Belum ada periode. Tap <b>Mulai Periode Baru</b> untuk membuat periode pertama — tanggal mulai bisa dimundurkan, dan biaya tercatat dibaca dari riwayat XL sejak tanggal itu.</div>';
 	} else {
-		var anchored = a.anchor_vnstat != null;
-		var effUsed = c.eff_used_bytes != null ? c.eff_used_bytes : c.used_bytes;
-		var pct = 0;
-		if (c.purchased_bytes) pct = Math.min(100, effUsed / c.purchased_bytes * 100);
-		var purchasedTxt = c.purchased_bytes == null ? "tanpa batas" : (gb(c.purchased_bytes, 0) + " GB terbeli");
-		var remainTxt = c.remain_bytes == null ? "tanpa batas" : (c.remain_bytes <= 0 ? "habis — blok berikutnya terpicu otomatis" : gb(c.remain_bytes, 1) + " GB");
-		var remainCls = (c.remain_bytes != null && c.remain_bytes < 2 * GB) ? ' style="color:var(--amber)"' : "";
 		var html = "";
 		html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">';
-		html += '<div class="big">' + gb(effUsed, 1) + ' GB <small>terpakai dari ' + purchasedTxt + "</small></div>";
-		if (a.mode === "blok") {
-			html += '<div class="blok-line"><span class="lbl">Blok terbeli</span><b>' + c.blocks + " blok (" + gb(c.purchased_bytes, 0) + ' GB)</b><span class="sub">efektif ' + rp(c.eff_price_per_gb) + "/GB</span></div>";
+		html += '<div class="big">' + rp(c.purchases_total) + ' <small>total biaya tercatat · ' + c.purchases_count + " pembelian</small></div>";
+		html += '<div class="cost-line"><span class="lbl">Terpakai</span><b>' + gb(c.used_bytes, 1) + ' GB</b>' +
+			(c.price_per_gb > 0 ? '<span class="sub">harga efektif ' + rp(c.price_per_gb) + "/GB</span>" : "") + "</div></div>";
+		if (c.remaining_bytes != null) {
+			var denom = c.used_bytes + c.remaining_bytes;
+			var pct = denom > 0 ? Math.min(100, c.used_bytes / denom * 100) : 0;
+			html += '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
+			html += '<div class="hint" style="margin:0">Terpakai ' + gb(c.used_bytes, 1) + " GB dari \u00B1" + gb(denom, 1) + " GB yang tersedia (terpakai + sisa operator saat ini).</div>";
 		}
-		html += '<div class="cost-line"><span class="lbl">Biaya sudah keluar</span><b>' + rp(c.paid) + '</b><span class="sub">nilai terpakai ' + rp(c.used_value) + "</span></div></div>";
-		if (c.purchased_bytes != null) html += '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
 		var left = c.days_total - c.day_number;
-		html += '<div class="hint" style="margin:0">Hari ke-' + c.day_number + " dari " + c.days_total
+		html += '<div class="hint">Hari ke-' + c.day_number + " dari " + c.days_total
 			+ (left >= 0 ? " · sisa " + left + " hari" : " · lewat " + (-left) + " hari")
 			+ " · mulai " + fmtDate(a.start) + " · berakhir " + fmtDate(c.expiry) + " 00:00</div>";
 		html += '<div class="meta">';
-		html += '<div><div class="k">Download</div><div class="v">' + (apiOn ? "&mdash;" : gb(c.dl_bytes, 1) + ' GB') + '</div></div>';
-		html += '<div><div class="k">Upload</div><div class="v">' + (apiOn ? "&mdash;" : gb(c.ul_bytes, 1) + ' GB') + '</div></div>';
-		html += '<div><div class="k">Sisa</div><div class="v"' + remainCls + ">" + remainTxt + "</div></div>";
+		var remainTxt = c.remaining_bytes == null ? "&mdash;" : gb(c.remaining_bytes, 1) + " GB";
+		var remainCls = (c.remaining_bytes != null && c.remaining_bytes < 2 * GB) ? ' style="color:var(--amber)"' : "";
+		html += '<div><div class="k">Sisa (operator)</div><div class="v"' + remainCls + ">" + remainTxt + "</div></div>";
 		html += '<div><div class="k">Hari ini</div><div class="v">' + gb(c.today_bytes, 1) + " GB</div></div>";
+		html += '<div><div class="k">Terpakai</div><div class="v">' + gb(c.used_bytes, 1) + " GB</div></div>";
+		html += '<div><div class="k">Biaya</div><div class="v">' + rp(c.purchases_total) + "</div></div>";
 		html += "</div>";
-		html += '<div class="lock-note">Skema dibekukan: ' + esc(schemeText(a)) + (a.iface === "br-lan" ? " · arah RX/TX dibalik" : "") + ".</div>";
-		if (apiOn) {
-			html += '<div class="lock-note">Sumber: API Sunset — nomor ' + esc(state.api.number || "-") + ". Terpakai, blok, dan sisa = angka operator langsung" + (state.api.vnstat_used_bytes != null ? ("; vnStat mencatat " + gb(state.api.vnstat_used_bytes, 1) + " GB (pembanding)") : "") + ". Rincian download/upload tidak tersedia dari operator.</div>";
+		if (h.api_active) {
+			html += '<div class="lock-note">Sumber: API Sunset — nomor ' + esc(api.number || "-") + ". Biaya = pembelian resmi XL dengan harga riil; terpakai dan sisa = angka operator langsung.</div>";
+		} else if (h.api_stale) {
+			html += '<div class="lock-note amber">API Sunset tidak terjangkau — angka di halaman ini adalah data terakhir diambil ' + fmtDateTime(api.last_fetch) + " WIB.</div>";
+		} else if (!h.api_configured) {
+			html += '<div class="lock-note amber">Sunset belum terkonfigurasi di STB ini — pasang app Sunset dan isi api_url + secret-nya dulu.</div>';
 		}
-		if (!c.complete && !apiOn) {
-			html += '<div class="lock-note amber">Data belum lengkap: ' + c.missing_days + " hari awal periode tidak tercatat vnStat — total terpakai = batas bawah.</div>";
-		}
-		var purchAnchor = a.mode === "langsung" ? (a.direct_gb || 0) * GB : (a.anchor_blocks || 0) * (a.block_gb || 10) * GB;
-		var remAnchor = purchAnchor - (a.anchor_eff || 0);
-		if (anchored && !apiOn) {
-			html += '<div class="lock-note">Jangkar operator: ' + (a.mode === "blok" ? a.anchor_blocks + " blok riil · " : "") + "sisa operator " + gb(remAnchor, 1) + " GB · disinkronkan " + fmtDate(a.anchor_date) + " — blok/biaya/sisa dari terpakai efektif; vnStat mencatat " + gb(c.used_bytes, 1) + " GB.</div>";
-		}
-		if (a.mode === "blok" && !anchored && !apiOn) {
-			html += '<div class="corr"><span class="lbl">Koreksi blok (pengecualian):</span>' +
-				'<button class="btn alt sm" id="bkCorrMinus" type="button">&minus;1 blok</button>' +
-				'<span class="lbl">koreksi sekarang: <b>' + (a.correction > 0 ? "+" : "") + a.correction + '</b></span>' +
-				'<button class="btn alt sm" id="bkCorrPlus" type="button">+1 blok</button></div>';
-		}
-		if (!apiOn) html += '<div class="corr"><span class="lbl">Sinkronkan ke operator:</span>' +
-			(a.mode === "blok" ? '<label class="lbl">Blok riil <input class="f sm-in" id="bkSyncBlocks" type="number" min="0" step="1" value="' + (anchored ? a.anchor_blocks : c.blocks) + '"></label>' : "") +
-			'<label class="lbl">Sisa operator (GB) <input class="f sm-in" id="bkSyncRemain" type="text" inputmode="decimal" placeholder="mis. 9,8" value="' + (anchored ? gb(remAnchor, 1) : "") + '"></label>' +
-			'<button class="btn alt sm" id="bkSyncBtn" type="button">Sinkronkan</button></div>' +
-			'<div class="msg" id="bkSyncMsg"></div>';
 		body.innerHTML = html;
-		var cm = el("bkCorrMinus"), cp = el("bkCorrPlus");
-		if (cm) cm.onclick = function(){ correct(-1); };
-		if (cp) cp.onclick = function(){ correct(1); };
-		var sb = el("bkSyncBtn");
-		if (sb) sb.onclick = function(){
-			var payload = { remaining_gb: el("bkSyncRemain").value };
-			var blk = el("bkSyncBlocks");
-			if (blk) payload.blocks = blk.value;
-			post("sync", payload, function(st, d){
-				if (d && d.ok) { msg("bkSyncMsg", "Tersinkron ke operator.", true); load(); }
-				else msg("bkSyncMsg", (d && d.error) || "Gagal sinkron.", false);
-			});
-		};
 	}
 
-	// Grafik + tabel harian
-	renderDaily();
-	// Riwayat
-	renderHistory();
-	// Biaya & proyeksi
-	renderCost();
-	// Status data
-	renderHealth();
-	// Pembelian tercatat provider
 	renderPurchases();
-	// Kunci catatan pengaturan
-	if (a) el("bkLockNote").textContent = "Periode berjalan dibekukan: " + schemeText(a) + ".";
+	renderDaily();
+	renderHistory();
+	renderSpend();
+	renderHealth();
 	// Undo
 	el("bkUndoBox").style.display = state.can_undo ? "block" : "none";
 	// Form pengaturan (hanya isi sekali per muat agar tidak menimpa editan)
 	if (!render.settingsFilled) {
 		render.settingsFilled = true;
-		var s = state.settings;
-		el("bkSetMode").value = s.mode;
-		el("bkSetBase").value = s.base;
-		el("bkSetDays").value = s.days;
-		el("bkSetDays2").value = s.days;
-		el("bkSetBlockGb").value = s.block_gb;
-		el("bkSetBlockRp").value = s.block_rp;
-		el("bkSetDirectRp").value = s.direct_rp;
-		el("bkSetDirectGb").value = s.direct_gb;
-		el("bkSetIface").value = s.next_iface;
-		syncModeFields();
+		el("bkSetDays").value = state.settings.days;
 	}
 	el("bkVerInstalled").textContent = state.version || "?";
 	el("bkExportBtn").href = BK_BASE + "/export";
+}
+
+function renderPurchases(){
+	var body = el("bkPurchBody");
+	var api = state.api || {}, h = state.health || {};
+	if (!state.active) {
+		body.innerHTML = '<div class="hint">Belum ada periode aktif.</div>';
+		return;
+	}
+	if (!h.api_configured) {
+		body.innerHTML = '<div class="hint">Memerlukan app Sunset terpasang dan secret terisi di STB yang sama — riwayat resmi XL dibaca lewat backend Sunset.</div>';
+		return;
+	}
+	var list = api.purchases || [];
+	if (!list.length) {
+		body.innerHTML = '<div class="hint">' + (h.api_stale
+			? "API Sunset sedang tidak terjangkau dan belum ada pembelian tersimpan untuk periode ini."
+			: "Belum ada pembelian SUCCESS tercatat XL dalam periode ini.") + "</div>";
+		return;
+	}
+	var rows = "";
+	for (var i = 0; i < list.length; i++) {
+		var tx = list[i];
+		var dt = tx.timestamp ? new Date(tx.timestamp * 1000) : null;
+		var dstr = dt ? (dt.getDate() + " " + (MONTHS[dt.getMonth()] || "") + " " + dt.getFullYear()) : "-";
+		rows += "<tr><td>" + dstr + "</td><td>" + esc(tx.title || "-") + '</td><td class="r">' + (tx.price != null ? rp(tx.price) : "-") + (tx.overridden ? ' <span title="Harga katalog XL: ' + rp(tx.price_orig || 0) + '">*</span>' : "") + ' <button class="btn alt sm" type="button" data-txkey="' + esc(tx.key || "") + '" data-txprice="' + (tx.price || 0) + '">&#9998;</button>' + "</td></tr>";
+	}
+	body.innerHTML = '<div style="overflow-x:auto"><table><thead><tr><th>Tanggal</th><th>Paket</th><th class="r">Harga</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+		'<div class="kv" style="margin-top:8px"><span class="k">Total tercatat (' + (api.purchases_count || list.length) + ' pembelian)</span><span class="v">' + rp(api.purchases_total || 0) + "</span></div>" +
+		'<div class="hint">Dari riwayat transaksi resmi XL — semua kanal pembelian, hanya status SUCCESS; reload pulsa tidak dihitung (itu pendanaan, bukan pembelian). Harga = pengeluaran riil: kalau XL mencatat harga katalog tapi kamu membayar lain, tap &#9998; untuk mengoreksi (bertanda *). Total ini adalah biaya resmi periode berjalan; saat periode ditutup, daftar ini tersimpan permanen di Riwayat Periode.</div>';
+	var btns = body.querySelectorAll("[data-txkey]");
+	for (var j = 0; j < btns.length; j++) {
+		btns[j].onclick = function(){
+			var v = prompt("Harga riil yang kamu bayar untuk transaksi ini (Rp). Kosongkan untuk kembali ke harga XL:", this.getAttribute("data-txprice"));
+			if (v === null) return;
+			post("txprice", { key: this.getAttribute("data-txkey"), price: v }, function(st2, d){
+				if (d && d.ok) load();
+				else alert((d && d.error) || "Gagal menyimpan koreksi harga.");
+			});
+		};
+	}
 }
 
 function renderDaily(){
@@ -534,10 +472,9 @@ function renderDaily(){
 			"<td>" + fmtDate(d.date) + (isToday ? " (jalan)" : "") + "</td>" +
 			'<td class="r">' + gb(d.bytes, 2) + " GB</td>" +
 			'<td class="r">' + gb(d.cum_bytes, 2) + " GB</td>" +
-			'<td class="r">' + d.inferred_blocks + "</td>" +
-			'<td class="r">' + rp(d.daily_cost) + "</td>" +
-			'<td class="r">' + rp(d.daily_used_value) + "</td>" +
-			'<td class="r">' + rp(d.cum_cost) + "</td></tr>";
+			'<td class="r">' + rp(d.cost) + "</td>" +
+			'<td class="r">' + rp(d.cum_cost) + "</td>" +
+			'<td class="r">' + (d.price_per_gb > 0 ? rp(d.price_per_gb) + "/GB" : "&mdash;") + "</td></tr>";
 	}
 	chart.innerHTML = ch;
 	tbody.innerHTML = rows;
@@ -552,165 +489,110 @@ function renderHistory(){
 	var rows = "";
 	var a = state.active, c = a ? a.computed : null;
 	if (a && c) {
-		var hangusRun = "&ndash;";
 		rows += '<tr><td>' + fmtDate(a.start) + ' &ndash; sekarang <span class="pill run">Berjalan</span></td>' +
 			'<td class="r">' + c.day_number + " / " + c.days_total + " hari</td>" +
-			'<td class="r">' + gb(c.eff_used_bytes != null ? c.eff_used_bytes : c.used_bytes, 1) + " GB</td>" +
-			'<td class="r">' + rp(c.paid) + "</td>" +
-			'<td class="r">' + hangusRun + "</td></tr>";
+			'<td class="r">' + gb(c.used_bytes, 1) + " GB</td>" +
+			'<td class="r">' + rp(c.purchases_total) + "</td></tr>";
 	}
 	var hist = state.history || [];
 	for (var i = 0; i < hist.length; i++) {
 		var s = hist[i];
-		rows += "<tr><td>" + fmtDate(s.start) + " &ndash; " + fmtDate(s.end_date) + ' <span class="pill done">Selesai</span></td>' +
+		var key = s.id || ("h" + i);
+		var hasDetail = s.purchases && s.purchases.length;
+		rows += "<tr><td>" + fmtDate(s.start) + " &ndash; " + fmtDate(s.end_date) + ' <span class="pill done">Selesai</span>' +
+			(s.purchases_count ? '<div class="hint" style="margin:2px 0 0">' + s.purchases_count + " pembelian</div>" : "") +
+			(hasDetail ? ' <button class="btn alt sm" type="button" data-hist="' + esc(key) + '">Rincian</button>' : "") + "</td>" +
 			'<td class="r">' + s.duration_days + " hari</td>" +
 			'<td class="r">' + gb(s.used_bytes, 1) + " GB</td>" +
-			'<td class="r">' + rp(s.paid) + "</td>" +
-			'<td class="r">' + gb(s.hangus_bytes, 0) + " GB</td></tr>";
+			'<td class="r">' + rp(s.paid) + "</td></tr>";
+		if (hasDetail) {
+			var items = "";
+			for (var j = 0; j < s.purchases.length; j++) {
+				var p = s.purchases[j];
+				items += "<div>" + fmtDate(p.date) + " · " + esc(p.title || "-") + " · " + rp(p.price) + (p.overridden ? ' <span title="Harga katalog XL: ' + rp(p.price_orig || 0) + '">*</span>' : "") + "</div>";
+			}
+			rows += '<tr class="detail-row" data-histrow="' + esc(key) + '" style="display:' + (histOpen[key] ? "" : "none") + '"><td colspan="4">' + items + "</td></tr>";
+		}
 	}
-	if (!rows) rows = '<tr><td colspan="5" class="hint">Belum ada riwayat.</td></tr>';
-	var t = state.totals || { used_bytes: 0, paid: 0, duration_days: 0, hangus_bytes: 0 };
+	if (!rows) rows = '<tr><td colspan="4" class="hint">Belum ada riwayat.</td></tr>';
+	var t = state.totals || { used_bytes: 0, paid: 0, duration_days: 0 };
 	rows += '<tr class="total-row"><td>Total Keseluruhan</td>' +
 		'<td class="r">' + t.duration_days + " hari</td>" +
 		'<td class="r">' + gb(t.used_bytes, 1) + " GB</td>" +
-		'<td class="r">' + rp(t.paid) + "</td>" +
-		'<td class="r">' + gb(t.hangus_bytes, 0) + " GB</td></tr>";
+		'<td class="r">' + rp(t.paid) + "</td></tr>";
 	tbody.innerHTML = rows;
-}
-
-function renderCost(){
-	var body = el("bkCostBody");
-	var a = state.active, c = a ? a.computed : null;
-	if (!a || !c) { body.innerHTML = '<div class="hint">Belum ada periode aktif.</div>'; return; }
-	var html = "";
-	if (a.mode === "blok" && c.projections) {
-		var p = c.projections;
-		html += '<div class="kv"><span class="k">Proyeksi akhir periode</span><span class="v">' + rp(p.low.paid) + " &ndash; " + rp(p.high.paid) + "</span></div>";
-		html += '<div class="kv"><span class="k">Blok tambahan diperkirakan</span><span class="v">+' + p.low.add_blocks + " s/d +" + p.high.add_blocks + " blok</span></div>";
-		html += '<div class="hint">Basis: rata-rata 7 hari penuh terakhir ' + gb(p.avg_7_bytes, 1) + " GB/hari vs periode " + gb(p.avg_all_bytes, 1) + " GB/hari.</div>";
-	} else if (a.mode === "blok") {
-		html += '<div class="hint">Proyeksi muncul setelah ada satu hari penuh.</div>';
-	} else {
-		html += '<div class="hint">Mode paket langsung: biaya tetap ' + rp(a.direct_rp) + " untuk periode ini.</div>";
-	}
-	if (c.expired) html += '<div class="hint" style="color:var(--amber)">Periode sudah berakhir ' + fmtDate(c.expiry) + " 00:00.</div>";
-	body.innerHTML = html;
-}
-
-function renderPurchases(){
-	var body = el("bkPurchBody");
-	var api = state.api || {};
-	if (!api.configured) {
-		body.innerHTML = '<div class="hint">Memerlukan app Sunset terpasang dan secret terisi di STB yang sama — riwayat resmi XL dibaca lewat backend Sunset.</div>';
-		return;
-	}
-	if (!api.active) {
-		body.innerHTML = '<div class="hint">API Sunset sedang tidak terjangkau; pembelian tercatat belum bisa diperbarui.</div>';
-		return;
-	}
-	var list = api.purchases || [];
-	if (!list.length) {
-		body.innerHTML = '<div class="hint">Belum ada pembelian SUCCESS tercatat XL dalam periode ini.</div>';
-		return;
-	}
-	var rows = "";
-	for (var i = 0; i < list.length; i++) {
-		var tx = list[i];
-		var dt = tx.timestamp ? new Date(tx.timestamp * 1000) : null;
-		var dstr = dt ? (dt.getDate() + " " + (MONTHS[dt.getMonth()] || "") + " " + dt.getFullYear()) : "-";
-		rows += "<tr><td>" + dstr + "</td><td>" + esc(tx.title || "-") + '</td><td class="r">' + (tx.price != null ? rp(tx.price) : "-") + (tx.overridden ? ' <span class="sub" title="Harga katalog XL: ' + rp(tx.price_orig || 0) + '">*</span>' : "") + ' <button class="btn alt sm" type="button" data-txkey="' + esc(tx.key || "") + '" data-txprice="' + (tx.price || 0) + '">&#9998;</button>' + "</td></tr>";
-	}
-	body.innerHTML = '<div style="overflow-x:auto"><table><thead><tr><th>Tanggal</th><th>Paket</th><th class="r">Harga</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
-		'<div class="kv" style="margin-top:8px"><span class="k">Total tercatat (' + (api.purchases_count || list.length) + ' pembelian)</span><span class="v">' + rp(api.purchases_total || 0) + "</span></div>" +
-		'<div class="hint">Dari riwayat transaksi resmi XL — semua kanal pembelian, hanya status SUCCESS; reload pulsa tidak dihitung (itu pendanaan, bukan pembelian). Harga = pengeluaran riil: kalau XL mencatat harga katalog tapi kamu membayar lain, tap &#9998; untuk mengoreksi (bertanda *). Bukti pembanding; biaya utama tetap rumus skema.</div>';
-	var btns = body.querySelectorAll("[data-txkey]");
-	for (var j = 0; j < btns.length; j++) {
-		btns[j].onclick = function(){
-			var v = prompt("Harga riil yang kamu bayar untuk transaksi ini (Rp). Kosongkan untuk kembali ke harga XL:", this.getAttribute("data-txprice"));
-			if (v === null) return;
-			post("txprice", { key: this.getAttribute("data-txkey"), price: v }, function(st2, d){
-				if (d && d.ok) load();
-				else alert((d && d.error) || "Gagal menyimpan koreksi harga.");
-			});
+	var btns = tbody.querySelectorAll("[data-hist]");
+	for (var k = 0; k < btns.length; k++) {
+		btns[k].onclick = function(){
+			var key2 = this.getAttribute("data-hist");
+			histOpen[key2] = !histOpen[key2];
+			var row = tbody.querySelector('[data-histrow="' + key2 + '"]');
+			if (row) row.style.display = histOpen[key2] ? "" : "none";
 		};
 	}
 }
 
-function renderHealth(){
-	var body = el("bkHealthBody");
-	var h = state.health || {}, a = state.active, c = a ? a.computed : null;
-	var statusTxt, cls = "status-ok";
-	if (!h.vnstat_ok) { statusTxt = "vnStat tidak terbaca"; cls = "status-warn"; }
-	else if (!a) { statusTxt = "Belum ada periode"; cls = "status-warn"; }
-	else if (h.active_monitored === false) { statusTxt = "Interface belum dimonitor"; cls = "status-warn"; }
-	else if (c && c.expired) { statusTxt = "Periode berakhir"; cls = "status-warn"; }
-	else if (c && !c.complete) { statusTxt = "Data belum lengkap"; cls = "status-warn"; }
-	else { statusTxt = "Data lengkap · Periode aktif"; }
+function renderSpend(){
+	var body = el("bkSpendBody");
+	var a = state.active, c = a ? a.computed : null;
+	if (!a || !c) { body.innerHTML = '<div class="hint">Belum ada periode aktif.</div>'; return; }
+	if (!c.purchases_total) { body.innerHTML = '<div class="hint">Belum ada pembelian tercatat pada periode ini.</div>'; return; }
+	var avg = c.purchases_total / Math.max(1, c.day_number);
+	var remainDays = Math.max(0, c.days_total - c.day_number);
+	var est = c.purchases_total + avg * remainDays;
 	var html = "";
-	html += '<div class="kv"><span class="k">Status</span><span class="v ' + cls + '">' + esc(statusTxt) + "</span></div>";
-	var api = state.api || {};
-	html += '<div class="kv"><span class="k">Sumber data</span><span class="v">' + (api.active ? "API Sunset (operator)" : (api.configured ? "vnStat (API tak terjangkau)" : "vnStat")) + "</span></div>";
-	if (api.active && api.number) html += '<div class="kv"><span class="k">Nomor aktif</span><span class="v">' + esc(api.number) + "</span></div>";
-	if (a) html += '<div class="kv"><span class="k">Interface periode</span><span class="v">' + esc(a.iface) + " (terkunci)</span></div>";
-	html += '<div class="kv"><span class="k">vnStat</span><span class="v">' + (h.vnstat_ok ? "aktif" : "tidak terbaca") + "</span></div>";
-	html += '<div class="kv"><span class="k">Update terakhir</span><span class="v">' + esc(h.updated || "-") + "</span></div>";
-	html += '<div class="kv"><span class="k">wwan0 (modem)</span><span class="v">' + (h.wwan_monitored ? "dimonitor" : "belum dimonitor") + "</span></div>";
-	if (c) html += '<div class="kv"><span class="k">Kelengkapan periode</span><span class="v">' + (c.complete ? "lengkap" : ("kurang " + c.missing_days + " hari")) + "</span></div>";
-	html += '<div class="hint">PnP: periode pertama otomatis br-lan; wwan0 aktif untuk periode berikutnya.</div>';
+	html += '<div class="kv"><span class="k">Rata-rata belanja</span><span class="v">' + rp(avg) + "/hari</span></div>";
+	html += '<div class="kv"><span class="k">Perkiraan total akhir periode</span><span class="v">' + rp(est) + "</span></div>";
+	html += '<div class="hint">Perkiraan kasar dari laju belanja tercatat selama ' + c.day_number + " hari berjalan, untuk sisa " + remainDays + " hari. Pembelian add-on terjadi saat kuota habis, jadi angka akhir bisa berbeda.</div>";
+	if (c.expired) html += '<div class="hint" style="color:var(--amber)">Periode sudah berakhir ' + fmtDate(c.expiry) + " 00:00.</div>";
 	body.innerHTML = html;
 }
 
-function correct(delta){
-	post("correct", { delta: delta }, function(st, d){
-		if (d && d.ok) load();
-	});
+function renderHealth(){
+	var body = el("bkHealthBody");
+	var h = state.health || {}, a = state.active, api = state.api || {};
+	var statusTxt, cls = "status-ok";
+	if (!a) { statusTxt = "Belum ada periode"; cls = "status-warn"; }
+	else if (!h.api_configured) { statusTxt = "Sunset belum terkonfigurasi"; cls = "status-warn"; }
+	else if (h.api_stale) { statusTxt = "API tak terjangkau · data terakhir"; cls = "status-warn"; }
+	else if (h.expired) { statusTxt = "Periode berakhir"; cls = "status-warn"; }
+	else { statusTxt = "Terhubung · Periode aktif"; }
+	var html = "";
+	html += '<div class="kv"><span class="k">Status</span><span class="v ' + cls + '">' + esc(statusTxt) + "</span></div>";
+	html += '<div class="kv"><span class="k">Sumber data</span><span class="v">API Sunset (operator)</span></div>';
+	if (api.number) html += '<div class="kv"><span class="k">Nomor aktif</span><span class="v">' + esc(api.number) + "</span></div>";
+	html += '<div class="kv"><span class="k">Ambil terakhir</span><span class="v">' + fmtDateTime(api.last_fetch) + "</span></div>";
+	html += '<div class="hint">Data diambil segar setiap halaman ini dibuka — tidak ada cache dan tidak ada snapshot latar. Hari tanpa kunjungan menyatu ke hari kunjungan berikutnya di tabel harian.</div>';
+	body.innerHTML = html;
 }
+
 function load(){
 	get("status", function(st, d){
 		if (d && d.ok) { state = d; render(); }
 		else el("bkPeriodBody").innerHTML = '<div class="hint">Gagal memuat status dari STB.</div>';
 	});
 }
-function syncModeFields(){
-	var direct = el("bkSetMode").value === "langsung";
-	el("bkSetBlok").style.display = direct ? "none" : "";
-	el("bkSetDirect").style.display = direct ? "" : "none";
-}
 
 el("bkRefresh").onclick = load;
 el("bkDailyToggle").onclick = function(){ dailyExpanded = !dailyExpanded; renderDaily(); };
-el("bkSetupBtn").onclick = function(){
-	this.disabled = true;
-	post("setup", {}, function(st, d){
-		el("bkSetupBtn").disabled = false;
-		if (d && d.ok) load();
-	});
-};
-el("bkSetMode").onchange = syncModeFields;
 el("bkSetSave").onclick = function(){
-	var daysVal = el("bkSetMode").value === "langsung" ? el("bkSetDays2").value : el("bkSetDays").value;
-	post("settings", {
-		mode: el("bkSetMode").value,
-		base: el("bkSetBase").value, days: daysVal,
-		block_gb: el("bkSetBlockGb").value, block_rp: el("bkSetBlockRp").value,
-		direct_rp: el("bkSetDirectRp").value, direct_gb: el("bkSetDirectGb").value,
-		next_iface: el("bkSetIface").value
-	}, function(st, d){
+	post("settings", { days: el("bkSetDays").value }, function(st, d){
 		if (d && d.ok) { msg("bkSetMsg", "Tersimpan. Berlaku untuk periode berikutnya.", true); render.settingsFilled = false; load(); }
 		else msg("bkSetMsg", (d && d.error) || "Gagal menyimpan.", false);
 	});
 };
 el("bkStartBtn").onclick = function(){
 	var a = state.active, c = a ? a.computed : null;
-	if (!a || !c) return;
-	el("bkModalIntro").textContent = "Periode berjalan akan ditutup sebagai snapshot final dan masuk riwayat. Periode baru memakai skema tersimpan untuk periode berikutnya: " + schemeText(state.settingsAsPeriod || {
-		mode: state.settings.mode, base: Number(state.settings.base), block_gb: Number(state.settings.block_gb),
-		block_rp: Number(state.settings.block_rp), days: Number(state.settings.days),
-		direct_rp: Number(state.settings.direct_rp), direct_gb: Number(state.settings.direct_gb),
-		iface: state.settings.next_iface });
-	el("bkModalSummary").textContent = "Yang akan ditutup: periode " + fmtDate(a.start) + " – " + fmtDate(c.expiry) + " · terpakai " + gb(c.eff_used_bytes != null ? c.eff_used_bytes : c.used_bytes, 1) + " GB · biaya " + rp(c.paid) + (c.remain_bytes ? (" · sisa " + gb(c.remain_bytes, 1) + " GB jadi hangus") : "") + ". Pastikan ini memang disengaja.";
+	if (a && c) {
+		el("bkModalIntro").textContent = "Periode berjalan akan ditutup sebagai snapshot permanen — daftar pembelian dan total biayanya tersimpan di Riwayat Periode.";
+		el("bkModalSummary").style.display = "block";
+		el("bkModalSummary").textContent = "Yang akan ditutup: periode " + fmtDate(a.start) + " – " + fmtDate(c.expiry) + " · terpakai " + gb(c.used_bytes, 1) + " GB · biaya tercatat " + rp(c.purchases_total) + " (" + c.purchases_count + " pembelian). Pastikan ini memang disengaja.";
+	} else {
+		el("bkModalIntro").textContent = "Membuat periode pertama. Biaya tercatat dibaca dari riwayat XL sejak tanggal mulai yang dipilih.";
+		el("bkModalSummary").style.display = "none";
+	}
 	el("bkStartDate").value = state.today;
-	el("bkOpening").value = "0";
+	el("bkStartDays").value = state.settings.days;
 	msg("bkStartMsg", "", true);
 	el("bkModal").style.background = themeSurface();
 	el("bkModalBg").className = "modal-bg open";
@@ -718,7 +600,7 @@ el("bkStartBtn").onclick = function(){
 el("bkCancelStart").onclick = function(){ el("bkModalBg").className = "modal-bg"; };
 el("bkModalBg").onclick = function(e){ if (e.target === this) this.className = "modal-bg"; };
 el("bkConfirmStart").onclick = function(){
-	post("start", { date: el("bkStartDate").value, opening_blocks: el("bkOpening").value }, function(st, d){
+	post("start", { date: el("bkStartDate").value, days: el("bkStartDays").value }, function(st, d){
 		if (d && d.ok) {
 			el("bkModalBg").className = "modal-bg";
 			render.settingsFilled = false;
@@ -754,9 +636,9 @@ el("bkImportBtn").onclick = function(){
 };
 
 el("bkResetBtn").onclick = function(){
-	if (!confirm("Reset data app? Semua snapshot riwayat dan periode aktif terhapus permanen. Pengaturan dipertahankan; data vnStat tidak disentuh.")) return;
+	if (!confirm("Reset data app? Semua snapshot riwayat, periode aktif, dan catatan pembelian terakumulasi terhapus permanen. Pengaturan dipertahankan.")) return;
 	post("reset", {}, function(st, d){
-		if (d && d.ok) { msg("bkResetMsg", "Data app direset; periode awal dibuat ulang dari vnStat.", true); render.settingsFilled = false; load(); }
+		if (d && d.ok) { msg("bkResetMsg", "Data app direset.", true); render.settingsFilled = false; load(); }
 		else msg("bkResetMsg", (d && d.error) || "Gagal reset data app.", false);
 	});
 };
