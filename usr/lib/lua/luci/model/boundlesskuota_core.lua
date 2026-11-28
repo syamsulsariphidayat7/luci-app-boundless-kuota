@@ -328,6 +328,54 @@ function M.unrecorded_gap(st, purchases)
 	return gap
 end
 
+-- Perkiraan biaya isi ulang yang belum tercatat: pola add-on yang
+-- paling sering dibeli (kelompok judul pembelian terbanyak yang
+-- cocok dengan bucket live) dianggap pola isi ulangnya — bucket yang
+-- hilang = selisih dibulatkan ke kelipatan ukuran bucket itu, dikali
+-- harga rata-rata pembeliannya (harga efektif, termasuk override).
+-- Mengembalikan { cost, buckets, unit } atau nil bila selisihnya nol
+-- atau polanya tidak bisa dinilai.
+function M.unrecorded_estimate(st, purchases)
+	local gap = M.unrecorded_gap(st, purchases)
+	if gap <= 0 then return nil end
+	local t = M.correction_target(st, purchases)
+	if not t then return nil end
+	local groups, order = {}, {}
+	for _, p in ipairs(purchases or {}) do
+		local pn = norm_name(p.title)
+		if pn ~= "" then
+			local g = groups[pn]
+			if not g then
+				g = { count = 0, sum = 0 }
+				groups[pn] = g
+				order[#order + 1] = pn
+			end
+			g.count = g.count + 1
+			g.sum = g.sum + (tonumber(p.price) or 0)
+		end
+	end
+	local best = nil
+	for _, pn in ipairs(order) do
+		local g = groups[pn]
+		for _, row in ipairs(t.rows) do
+			local bn = norm_name(row.name)
+			if #bn >= 8 and (pn == bn
+				or bn:find(pn, 1, true) or pn:find(bn, 1, true)) then
+				if not best or g.count > best.count then
+					best = { count = g.count, sum = g.sum, total = row.total_bytes }
+				end
+				break
+			end
+		end
+	end
+	if not best or not best.total or best.total <= 0 then return nil end
+	local buckets = math.floor(gap / best.total + 0.5)
+	if buckets < 1 then buckets = 1 end
+	local avg = math.floor(best.sum / best.count + 0.5)
+	if avg <= 0 then return nil end
+	return { cost = buckets * avg, buckets = buckets, unit = avg }
+end
+
 -- Ganti nomor aktif: total terpakai dipertahankan sebagai offset
 -- baru, peta paket disemai ulang dari daftar live nomor baru.
 function M.api_reseed(st, live)

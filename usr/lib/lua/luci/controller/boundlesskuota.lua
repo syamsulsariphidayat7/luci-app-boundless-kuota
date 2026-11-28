@@ -414,6 +414,7 @@ function action_status()
 		local day_number = (core.day_diff(active.start, today) or 0) + 1
 		if day_number < 1 then day_number = 1 end
 		if day_number > active.days then day_number = active.days end
+		local est = st and core.unrecorded_estimate(st, purch.list) or nil
 		computed = {
 			expiry = expiry,
 			expired = expired,
@@ -428,6 +429,9 @@ function action_status()
 			purchases_count = purch.count,
 			price_per_gb = used > 0 and (purch.total / (used / core.GB)) or 0,
 			unrecorded_bytes = st and core.unrecorded_gap(st, purch.list) or 0,
+			unrecorded_est_cost = est and est.cost or 0,
+			unrecorded_est_buckets = est and est.buckets or 0,
+			unrecorded_est_unit = est and est.unit or 0,
 		}
 		api.purchases = purch.list
 		api.purchases_total = purch.total

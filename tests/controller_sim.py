@@ -403,6 +403,15 @@ check(s["active"]["computed"]["used_bytes"] == 35 * GB,
 check(s["active"]["computed"]["unrecorded_bytes"] == 10 * GB,
       "gap: selisih belum tercatat = 35 - target 25 = 10 GB",
       str(s["active"]["computed"]["unrecorded_bytes"]))
+check(s["active"]["computed"]["unrecorded_est_cost"] == 2833,
+      "gap: perkiraan = 1 bucket x rata-rata harga efektif IG fixture "
+      "(3000+3000+2500 override)/3 = Rp2.833",
+      str(s["active"]["computed"]["unrecorded_est_cost"]))
+check(s["active"]["computed"]["unrecorded_est_buckets"] == 1,
+      "gap: 1 bucket tertunda", str(s["active"]["computed"]["unrecorded_est_buckets"]))
+check(s["active"]["computed"]["unrecorded_est_unit"] == 2833,
+      "gap: harga satuan perkiraan Rp2.833",
+      str(s["active"]["computed"]["unrecorded_est_unit"]))
 
 
 # 15) Reset data app.

@@ -193,5 +193,21 @@ eq(core.unrecorded_gap(stg2, purch9), 0, "gap: selisih 0,5 GB di bawah ambang ->
 eq(core.unrecorded_gap(stg, { { title = "Paket Lain Sekali" } }), 0,
 	"gap: tanpa pembelian cocok -> 0")
 
+-- ===== Perkiraan biaya isi ulang belum tercatat (0.4.11) =====
+local purch9p, purch8p = {}, {}
+for i = 1, 9 do purch9p[i] = { title = "Bonus Kuota Instagram 10GB", price = 3000 } end
+for i = 1, 8 do purch8p[i] = { title = "Bonus Kuota Instagram 10GB", price = 3000 } end
+local est1 = core.unrecorded_estimate(stg, purch9p)
+eq(est1 and est1.cost, 3000, "perkiraan: selisih 10 GB = 1 bucket IG x Rp3.000")
+eq(est1 and est1.buckets, 1, "perkiraan: 1 bucket tertunda")
+eq(est1 and est1.unit, 3000, "perkiraan: harga satuan Rp3.000")
+local est2 = core.unrecorded_estimate(stg, purch8p)
+eq(est2 and est2.cost, 6000, "perkiraan: selisih 20 GB (8 tercatat) = 2 bucket x Rp3.000")
+eq(est2 and est2.buckets, 2, "perkiraan: 2 bucket tertunda")
+eq(core.unrecorded_estimate(stg, purch10), nil,
+	"perkiraan: tanpa selisih -> nil")
+eq(core.unrecorded_estimate(stg, purch9), nil,
+	"perkiraan: riwayat tanpa harga -> nil (tidak bisa dinilai)")
+
 print(string.format("HASIL: %d lulus, %d gagal", pass, fail))
 TEST_FAIL = fail

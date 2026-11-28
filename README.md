@@ -54,7 +54,10 @@ app ini buku catatannya. Sejak 0.4.0 satu-satunya sumber app ini adalah
   pembeliannya belum muncul di riwayat XL (selisih dari hitungan
   pembelian ≥ 1 GiB) — total biaya saat itu belum termasuk
   pembelian tersebut; banner hilang sendiri begitu transaksinya
-  tercatat.
+  tercatat. Selama banner aktif, di samping total tercatat tampil
+  pula perkiraan totalnya (tercatat + tertunda) beserta rincian
+  tertundanya — pola add-on yang paling sering dibeli: jumlah
+  bucket yang hilang x harga rata-rata efektifnya.
 - **Periode** dimulai manual lewat tombol *Mulai Periode Baru* (pas
   beli dasar), tanggal mulai bisa dimundurkan; periode lama ditutup
   sebagai **snapshot permanen** di riwayat — lengkap dengan daftar
