@@ -388,6 +388,182 @@ function M.compute(all_days, period, today, now_epoch)
 	}
 end
 
+-- ---------- sumber API Sunset (0.3.0) ----------
+--
+-- Sumber utama baru: data kuota resmi operator dari backend Sunset
+-- (GET /api/luci/welcome + /api/luci/history), menggantikan tebakan
+-- vnStat. Keadaan API per periode ("api state"):
+--   state = {
+--     offset = byte di luar peta paket (hasil migrasi dari akuntansi
+--              vnStat/jangkar saat API pertama kali mengambil alih),
+--     bmap   = { [kunci] = { total, last_used, baseline, frozen } },
+--     cum    = { ["YYYY-MM-DD"] = kumulatif periode (termasuk
+--              offset) pada akhir hari tercatat },
+--     txs    = { [kunci] = transaksi provider terakumulasi },
+--   }
+-- Kunci paket = nama .. "|" .. epoch kedaluwarsa. baseline = terpakai
+-- paket saat periode mulai (atau saat paket pertama terlihat di awal
+-- periode); paket yang muncul di tengah periode baseline-nya 0.
+-- Paket yang hilang dari daftar live DIBEKUKAN pada terpakai
+-- terakhirnya, jadi pemakaian paket kedaluwarsa tidak ikut hilang.
+-- Terpakai periode = offset + Sigma max(0, last_used - baseline).
+
+function M.benefit_key(name, expired)
+	return tostring(name or "") .. "|" .. tostring(expired or "")
+end
+
+local function benefit_used(b)
+	local used = (tonumber(b.total) or 0) - (tonumber(b.remaining) or 0)
+	if used < 0 then used = 0 end
+	return used
+end
+
+-- Keadaan awal: semua paket live jadi baseline (terpakai mereka
+-- belum dihitung periode ini), offset dari akuntansi sebelumnya.
+function M.api_seed(live, offset)
+	local st = { offset = tonumber(offset) or 0, bmap = {}, cum = {}, txs = {} }
+	for _, b in ipairs(live or {}) do
+		local used = benefit_used(b)
+		st.bmap[b.key] = {
+			total = tonumber(b.total) or 0, last_used = used,
+			baseline = used, frozen = false,
+		}
+	end
+	return st
+end
+
+-- Terapkan daftar paket live terbaru ke keadaan.
+function M.api_update(st, live)
+	local seen = {}
+	local was_empty = next(st.bmap) == nil
+	for _, b in ipairs(live or {}) do
+		seen[b.key] = true
+		local used = benefit_used(b)
+		local e = st.bmap[b.key]
+		if e then
+			e.total = tonumber(b.total) or 0
+			e.last_used = used
+			e.frozen = false
+		else
+			st.bmap[b.key] = {
+				total = tonumber(b.total) or 0, last_used = used,
+				baseline = was_empty and used or 0, frozen = false,
+			}
+		end
+	end
+	for k, e in pairs(st.bmap) do
+		if not seen[k] then e.frozen = true end
+	end
+	return st
+end
+
+-- Total terpakai periode (byte) menurut keadaan API.
+function M.api_used(st)
+	local total = tonumber(st.offset) or 0
+	for _, e in pairs(st.bmap or {}) do
+		local d = (tonumber(e.last_used) or 0) - (tonumber(e.baseline) or 0)
+		if d > 0 then total = total + d end
+	end
+	return total
+end
+
+-- Ganti nomor aktif: total terpakai dipertahankan sebagai offset
+-- baru, peta paket disemai ulang dari daftar live nomor baru.
+function M.api_reseed(st, live)
+	local total = M.api_used(st)
+	local fresh = M.api_seed(live, total)
+	st.offset = fresh.offset
+	st.bmap = fresh.bmap
+	return st
+end
+
+-- Bangun daftar hari { date, bytes, dl=0, ul=0 } untuk M.compute
+-- dari kumulatif tercatat (state.cum) + posisi hari ini.
+function M.api_days(st, period_start, today)
+	local cur = M.api_used(st)
+	local pts = {}
+	local before = 0
+	for date, cum in pairs(st.cum or {}) do
+		if date < period_start then
+			if (tonumber(cum) or 0) > before then before = tonumber(cum) or 0 end
+		elseif date <= today then
+			pts[#pts + 1] = { date = date, cum = tonumber(cum) or 0 }
+		end
+	end
+	table.sort(pts, function(a, b) return a.date < b.date end)
+	if #pts == 0 or pts[#pts].date ~= today then
+		pts[#pts + 1] = { date = today, cum = cur }
+	end
+	local days = {}
+	local prev = before
+	for _, p in ipairs(pts) do
+		local delta = p.cum - prev
+		if delta < 0 then delta = 0 end
+		days[#days + 1] = { date = p.date, bytes = delta, dl = 0, ul = 0 }
+		prev = p.cum
+	end
+	if #days > 0 and days[1].date > period_start then
+		table.insert(days, 1, { date = period_start, bytes = 0, dl = 0, ul = 0 })
+	end
+	return days
+end
+
+-- ---------- riwayat transaksi provider ----------
+
+-- Kunci dedupe transaksi: trx_code bila ada, kalau tidak gabungan
+-- timestamp|judul|harga (trx_code XL sering kosong).
+function M.tx_key(tx)
+	if type(tx) ~= "table" then return nil end
+	if tx.trx_code and tx.trx_code ~= "" then return "c:" .. tx.trx_code end
+	if tx.timestamp and tx.title then
+		return "t:" .. tostring(tx.timestamp) .. "|" .. tostring(tx.title)
+			.. "|" .. tostring(tx.price or "")
+	end
+	return nil
+end
+
+function M.tx_is_success(tx)
+	return type(tx) == "table" and tx.status == "SUCCESS"
+end
+
+-- Gabungkan transaksi hasil ambil terbaru ke akumulasi keadaan.
+-- Mengembalikan jumlah transaksi baru.
+function M.api_merge_tx(st, fetched)
+	st.txs = st.txs or {}
+	local added = 0
+	for _, tx in ipairs(fetched or {}) do
+		local k = M.tx_key(tx)
+		if k and not st.txs[k] then
+			st.txs[k] = {
+				timestamp = tonumber(tx.timestamp),
+				title = tx.title or "",
+				price = tonumber(tx.price),
+				status = tx.status or "",
+				payment_status = tx.payment_status or "",
+				payment_method = tx.payment_method or "",
+			}
+			added = added + 1
+		end
+	end
+	return added
+end
+
+-- Pembelian SUCCESS di dalam jendela tanggal [start, end_excl).
+function M.api_purchases(st, start_date, end_excl)
+	local list, total = {}, 0
+	for _, tx in pairs(st.txs or {}) do
+		if M.tx_is_success(tx) and tx.timestamp then
+			local d = M.epoch_date(tx.timestamp)
+			if d >= start_date and d < end_excl then
+				list[#list + 1] = tx
+				total = total + (tonumber(tx.price) or 0)
+			end
+		end
+	end
+	table.sort(list, function(a, b) return (a.timestamp or 0) < (b.timestamp or 0) end)
+	return { list = list, total = total, count = #list }
+end
+
 -- Snapshot final periode yang ditutup pada jendela [start, end).
 function M.snapshot(all_days, period, end_date)
 	local w = compute_window(all_days, period, end_date)

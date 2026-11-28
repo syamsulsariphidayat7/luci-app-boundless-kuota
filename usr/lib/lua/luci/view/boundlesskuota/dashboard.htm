@@ -198,6 +198,11 @@
 			</div>
 
 			<div class="card">
+				<h2>Pembelian Tercatat (XL)</h2>
+				<div id="bkPurchBody"><div class="hint">Memuat...</div></div>
+			</div>
+
+			<div class="card">
 				<h2>Pengaturan — Untuk Periode Berikutnya</h2>
 				<div class="lock-note" id="bkLockNote"></div>
 				<label class="f">Mode skema</label>
@@ -247,7 +252,7 @@
 		</div>
 	</div>
 
-	<div class="foot">Data vnStat STB (±5 menit). Sisa kuota = perkiraan dari traffic STB, bukan angka resmi operator.</div>
+	<div class="foot" id="bkFoot">Data vnStat STB (±5 menit). Sisa kuota = perkiraan dari traffic STB, bukan angka resmi operator.</div>
 
 	<div class="modal-bg" id="bkModalBg">
 		<div class="modal" id="bkModal">
@@ -378,11 +383,21 @@ function schemeText(a){
 function render(){
 	if (!state) return;
 	var a = state.active, c = a ? a.computed : null, h = state.health || {};
-	el("bkUpdated").textContent = h.updated ? ("vnStat terakhir: " + h.updated.replace(" ", " · ") + " WIB") : "";
+	var apiOn = !!(state.api && state.api.active);
+	if (apiOn && state.api.last_fetch) {
+		var lf = new Date(state.api.last_fetch * 1000);
+		var lfs = ("0" + lf.getHours()).slice(-2) + ":" + ("0" + lf.getMinutes()).slice(-2);
+		el("bkUpdated").textContent = "API Sunset terakhir: " + lfs + " WIB";
+	} else {
+		el("bkUpdated").textContent = h.updated ? ("vnStat terakhir: " + h.updated.replace(" ", " · ") + " WIB") : "";
+	}
+	el("bkFoot").textContent = apiOn
+		? "Data dari API Sunset — terpakai, sisa, dan pembelian adalah angka resmi operator XL. vnStat hanya pembanding."
+		: "Data vnStat STB (±5 menit). Sisa kuota = perkiraan dari traffic STB, bukan angka resmi operator.";
 
 	// Banner peringatan
 	var banner = "";
-	if (!h.vnstat_ok) banner = "vnStat tidak bisa dibaca di STB ini. Pastikan paket vnstat terpasang dan vnstatd berjalan.";
+	if (!h.vnstat_ok && !apiOn) banner = "vnStat tidak bisa dibaca di STB ini. Pastikan paket vnstat terpasang dan vnstatd berjalan.";
 	else if (a && h.active_monitored === false) banner = "Interface " + esc(a.iface) + " belum dimonitor vnStat — belum ada data. Aktifkan lewat tombol setup atau tunggu vnStat mulai mencatat.";
 	else if (c && c.expired) banner = "Periode berakhir — menunggu periode baru. Beli dasar baru, lalu tap Mulai Periode Baru.";
 	el("bkBanner").textContent = banner;
@@ -416,27 +431,30 @@ function render(){
 			+ (left >= 0 ? " · sisa " + left + " hari" : " · lewat " + (-left) + " hari")
 			+ " · mulai " + fmtDate(a.start) + " · berakhir " + fmtDate(c.expiry) + " 00:00</div>";
 		html += '<div class="meta">';
-		html += '<div><div class="k">Download</div><div class="v">' + gb(c.dl_bytes, 1) + ' GB</div></div>';
-		html += '<div><div class="k">Upload</div><div class="v">' + gb(c.ul_bytes, 1) + ' GB</div></div>';
+		html += '<div><div class="k">Download</div><div class="v">' + (apiOn ? "&mdash;" : gb(c.dl_bytes, 1) + ' GB') + '</div></div>';
+		html += '<div><div class="k">Upload</div><div class="v">' + (apiOn ? "&mdash;" : gb(c.ul_bytes, 1) + ' GB') + '</div></div>';
 		html += '<div><div class="k">Sisa</div><div class="v"' + remainCls + ">" + remainTxt + "</div></div>";
 		html += '<div><div class="k">Hari ini</div><div class="v">' + gb(c.today_bytes, 1) + " GB</div></div>";
 		html += "</div>";
 		html += '<div class="lock-note">Skema dibekukan: ' + esc(schemeText(a)) + (a.iface === "br-lan" ? " · arah RX/TX dibalik" : "") + ".</div>";
-		if (!c.complete) {
+		if (apiOn) {
+			html += '<div class="lock-note">Sumber: API Sunset — nomor ' + esc(state.api.number || "-") + ". Terpakai, blok, dan sisa = angka operator langsung" + (state.api.vnstat_used_bytes != null ? ("; vnStat mencatat " + gb(state.api.vnstat_used_bytes, 1) + " GB (pembanding)") : "") + ". Rincian download/upload tidak tersedia dari operator.</div>";
+		}
+		if (!c.complete && !apiOn) {
 			html += '<div class="lock-note amber">Data belum lengkap: ' + c.missing_days + " hari awal periode tidak tercatat vnStat — total terpakai = batas bawah.</div>";
 		}
 		var purchAnchor = a.mode === "langsung" ? (a.direct_gb || 0) * GB : (a.anchor_blocks || 0) * (a.block_gb || 10) * GB;
 		var remAnchor = purchAnchor - (a.anchor_eff || 0);
-		if (anchored) {
+		if (anchored && !apiOn) {
 			html += '<div class="lock-note">Jangkar operator: ' + (a.mode === "blok" ? a.anchor_blocks + " blok riil · " : "") + "sisa operator " + gb(remAnchor, 1) + " GB · disinkronkan " + fmtDate(a.anchor_date) + " — blok/biaya/sisa dari terpakai efektif; vnStat mencatat " + gb(c.used_bytes, 1) + " GB.</div>";
 		}
-		if (a.mode === "blok" && !anchored) {
+		if (a.mode === "blok" && !anchored && !apiOn) {
 			html += '<div class="corr"><span class="lbl">Koreksi blok (pengecualian):</span>' +
 				'<button class="btn alt sm" id="bkCorrMinus" type="button">&minus;1 blok</button>' +
 				'<span class="lbl">koreksi sekarang: <b>' + (a.correction > 0 ? "+" : "") + a.correction + '</b></span>' +
 				'<button class="btn alt sm" id="bkCorrPlus" type="button">+1 blok</button></div>';
 		}
-		html += '<div class="corr"><span class="lbl">Sinkronkan ke operator:</span>' +
+		if (!apiOn) html += '<div class="corr"><span class="lbl">Sinkronkan ke operator:</span>' +
 			(a.mode === "blok" ? '<label class="lbl">Blok riil <input class="f sm-in" id="bkSyncBlocks" type="number" min="0" step="1" value="' + (anchored ? a.anchor_blocks : c.blocks) + '"></label>' : "") +
 			'<label class="lbl">Sisa operator (GB) <input class="f sm-in" id="bkSyncRemain" type="text" inputmode="decimal" placeholder="mis. 9,8" value="' + (anchored ? gb(remAnchor, 1) : "") + '"></label>' +
 			'<button class="btn alt sm" id="bkSyncBtn" type="button">Sinkronkan</button></div>' +
@@ -465,6 +483,8 @@ function render(){
 	renderCost();
 	// Status data
 	renderHealth();
+	// Pembelian tercatat provider
+	renderPurchases();
 	// Kunci catatan pengaturan
 	if (a) el("bkLockNote").textContent = "Periode berjalan dibekukan: " + schemeText(a) + ".";
 	// Undo
@@ -577,6 +597,34 @@ function renderCost(){
 	body.innerHTML = html;
 }
 
+function renderPurchases(){
+	var body = el("bkPurchBody");
+	var api = state.api || {};
+	if (!api.configured) {
+		body.innerHTML = '<div class="hint">Memerlukan app Sunset terpasang dan secret terisi di STB yang sama — riwayat resmi XL dibaca lewat backend Sunset.</div>';
+		return;
+	}
+	if (!api.active) {
+		body.innerHTML = '<div class="hint">API Sunset sedang tidak terjangkau; pembelian tercatat belum bisa diperbarui.</div>';
+		return;
+	}
+	var list = api.purchases || [];
+	if (!list.length) {
+		body.innerHTML = '<div class="hint">Belum ada pembelian SUCCESS tercatat XL dalam periode ini.</div>';
+		return;
+	}
+	var rows = "";
+	for (var i = 0; i < list.length; i++) {
+		var tx = list[i];
+		var dt = tx.timestamp ? new Date(tx.timestamp * 1000) : null;
+		var dstr = dt ? (dt.getDate() + " " + (MONTHS[dt.getMonth()] || "") + " " + dt.getFullYear()) : "-";
+		rows += "<tr><td>" + dstr + "</td><td>" + esc(tx.title || "-") + '</td><td class="r">' + (tx.price != null ? rp(tx.price) : "-") + "</td></tr>";
+	}
+	body.innerHTML = '<div style="overflow-x:auto"><table><thead><tr><th>Tanggal</th><th>Paket</th><th class="r">Harga</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+		'<div class="kv" style="margin-top:8px"><span class="k">Total tercatat (' + (api.purchases_count || list.length) + ' pembelian)</span><span class="v">' + rp(api.purchases_total || 0) + "</span></div>" +
+		'<div class="hint">Dari riwayat transaksi resmi XL — semua kanal pembelian, hanya status SUCCESS. Bukti pembanding; biaya utama tetap rumus skema.</div>';
+}
+
 function renderHealth(){
 	var body = el("bkHealthBody");
 	var h = state.health || {}, a = state.active, c = a ? a.computed : null;
@@ -589,6 +637,9 @@ function renderHealth(){
 	else { statusTxt = "Data lengkap · Periode aktif"; }
 	var html = "";
 	html += '<div class="kv"><span class="k">Status</span><span class="v ' + cls + '">' + esc(statusTxt) + "</span></div>";
+	var api = state.api || {};
+	html += '<div class="kv"><span class="k">Sumber data</span><span class="v">' + (api.active ? "API Sunset (operator)" : (api.configured ? "vnStat (API tak terjangkau)" : "vnStat")) + "</span></div>";
+	if (api.active && api.number) html += '<div class="kv"><span class="k">Nomor aktif</span><span class="v">' + esc(api.number) + "</span></div>";
 	if (a) html += '<div class="kv"><span class="k">Interface periode</span><span class="v">' + esc(a.iface) + " (terkunci)</span></div>";
 	html += '<div class="kv"><span class="k">vnStat</span><span class="v">' + (h.vnstat_ok ? "aktif" : "tidak terbaca") + "</span></div>";
 	html += '<div class="kv"><span class="k">Update terakhir</span><span class="v">' + esc(h.updated || "-") + "</span></div>";

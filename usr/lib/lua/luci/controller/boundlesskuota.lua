@@ -14,6 +14,13 @@ module("luci.controller.boundlesskuota", package.seeall)
 --   GET  version / check, POST update, GET updatelog (Versi & Update)
 -- Perhitungan murni ada di luci.model.boundlesskuota_core. App ini
 -- tidak pernah menulis ke database vnStat; vnStat hanya dibaca.
+-- Sejak 0.3.0 sumber utama adalah API Sunset (backend yang sama
+-- dengan luci-app-sunset, config dipinjam dari UCI sunset): terpakai
+-- + sisa dari /api/luci/welcome (angka operator), pembelian dari
+-- /api/luci/history. vnStat + jangkar menjadi cadangan otomatis bila
+-- API tidak terjangkau. Keadaan API disimpan di berkas JSON
+-- /etc/boundlesskuota-api.json (env BK_API_STATE menimpanya, untuk
+-- pengujian) dan diperbarui juga oleh cron /usr/bin/boundlesskuota-snapshot.
 function index()
 	if not nixio.fs.access("/etc/config/boundlesskuota") then
 		return
@@ -349,6 +356,152 @@ local function ensure_state(uci, vdata)
 	return settings
 end
 
+-- ---------- sumber API Sunset (0.3.0) ----------
+
+local API_CACHE_FILE = "/tmp/boundlesskuota-api-cache.json"
+local API_CACHE_TTL  = 120
+
+local function api_state_path()
+	return os.getenv("BK_API_STATE") or "/etc/boundlesskuota-api.json"
+end
+
+local function load_json_file(path)
+	local raw = read_file(path)
+	if not raw or raw == "" then return nil end
+	local t = luci.jsonc.parse(raw)
+	if type(t) ~= "table" then return nil end
+	return t
+end
+
+local function save_json_file(path, tbl)
+	local f = io.open(path, "w")
+	if not f then return false end
+	f:write(luci.jsonc.stringify(tbl))
+	f:close()
+	return true
+end
+
+-- Config backend dipinjam dari app Sunset (satu-satunya pemilik
+-- secret): uci sunset.settings.api_url + .secret.
+local function sunset_config()
+	local c = new_cursor()
+	local url = c:get("sunset", "settings", "api_url")
+	local secret = c:get("sunset", "settings", "secret")
+	if url then url = (url:gsub("/+$", "")) end
+	return url, secret
+end
+
+local function fetch_api_json(url, secret)
+	local out = luci.sys.exec(string.format(
+		"curl -fsSL --connect-timeout 6 --max-time 25 -H %s %s 2>/dev/null",
+		luci.util.shellquote("x-luci-secret: " .. secret),
+		luci.util.shellquote(url)))
+	if not out or out == "" then return nil end
+	local t = luci.jsonc.parse(out)
+	if type(t) ~= "table" then return nil end
+	return t
+end
+
+-- Ambil welcome + history, cache 120 detik di /tmp (satu slot,
+-- divalidasi URL-nya). history best-effort: gagal pun welcome jalan.
+local function api_fetch(base_url, secret)
+	local cache = load_json_file(API_CACHE_FILE)
+	if cache and cache.url == base_url and cache.at
+		and (os.time() - cache.at) < API_CACHE_TTL and cache.welcome then
+		return cache.welcome, cache.history
+	end
+	local welcome = fetch_api_json(base_url .. "/api/luci/welcome", secret)
+	if not welcome then return nil, nil end
+	local history = fetch_api_json(base_url .. "/api/luci/history", secret)
+	save_json_file(API_CACHE_FILE, {
+		url = base_url, at = os.time(), welcome = welcome, history = history,
+	})
+	return welcome, history
+end
+
+-- Siapkan data API untuk periode aktif: perbarui keadaan API dari
+-- backend Sunset bila terkonfigurasi & terjangkau. Mengembalikan
+-- (info, days, period_copy) bila API aktif; selain itu (info) saja
+-- dan pemanggil memakai jalur vnStat seperti biasa.
+local function api_prepare(active, vdata)
+	local info = { configured = false, active = false }
+	local base_url, secret = sunset_config()
+	if not base_url or base_url == "" or not secret or secret == "" then
+		return info
+	end
+	info.configured = true
+	local welcome, history = api_fetch(base_url, secret)
+	if not welcome or welcome.ok ~= true or type(welcome.quotas) ~= "table" then
+		info.error = "API Sunset tidak terjangkau."
+		return info
+	end
+	local live = {}
+	for _, q in ipairs(welcome.quotas) do
+		if not q.unlimited and tonumber(q.total_bytes) and tonumber(q.remaining_bytes) then
+			live[#live + 1] = {
+				key = core.benefit_key(q.name, q.expired_at),
+				total = tonumber(q.total_bytes),
+				remaining = tonumber(q.remaining_bytes),
+			}
+		end
+	end
+	local today = today_str()
+	local st = load_json_file(api_state_path())
+	if not st or st.period_start ~= active.start then
+		-- Inisialisasi/migrasi: terpakai efektif akuntansi lama
+		-- (vnStat + jangkar) menjadi offset; paket live = baseline.
+		local vc = core.compute(iface_days(vdata, active.iface), active, today, os.time())
+		st = core.api_seed(live, vc.eff_used_bytes or vc.used_bytes or 0)
+		st.period_start = active.start
+		st.number = welcome.number
+		info.migrated = true
+		-- Semai kumulatif harian dari riwayat vnStat (transformasi
+		-- efektif yang sama) agar tabel harian dan rata-rata
+		-- proyeksi tidak meloncat saat API mengambil alih di
+		-- tengah periode.
+		local run = 0
+		for _, d in ipairs(iface_days(vdata, active.iface)) do
+			if d.date >= active.start and d.date < today then
+				run = run + d.bytes
+				st.cum[d.date] = core.effective_used(run, active)
+			end
+		end
+	elseif tostring(st.number) ~= tostring(welcome.number) then
+		core.api_reseed(st, live)
+		st.number = welcome.number
+		st.txs = {}
+		info.number_changed = true
+	else
+		core.api_update(st, live)
+	end
+	if history and history.ok == true and type(history.transactions) == "table" then
+		info.added_tx = core.api_merge_tx(st, history.transactions)
+		info.history_ok = true
+	end
+	st.cum = st.cum or {}
+	st.cum[today] = core.api_used(st)
+	st.last_fetch = os.time()
+	save_json_file(api_state_path(), st)
+
+	-- Salinan periode tanpa jangkar/koreksi/blok awal: di mode API
+	-- angka murni dari operator, inferensi blok tidak ditimpa.
+	local pcopy = {}
+	for k, v in pairs(active) do pcopy[k] = v end
+	pcopy.anchor_vnstat, pcopy.anchor_eff = nil, nil
+	pcopy.anchor_blocks, pcopy.anchor_date = nil, nil
+	pcopy.opening_blocks, pcopy.correction = 0, 0
+
+	local expiry = core.add_days(active.start, active.days)
+	local purch = core.api_purchases(st, active.start, expiry)
+	info.active = true
+	info.number = welcome.number
+	info.last_fetch = st.last_fetch
+	info.purchases = purch.list
+	info.purchases_total = purch.total
+	info.purchases_count = purch.count
+	return info, core.api_days(st, active.start, today), pcopy
+end
+
 -- ---------- status ----------
 
 local function collect_history(uci)
@@ -380,9 +533,17 @@ function action_status()
 
 	local computed = nil
 	local active_days = {}
+	local api = nil
 	if active then
 		active_days = iface_days(vdata, active.iface)
 		computed = core.compute(active_days, active, today_str(), os.time())
+		local vnstat_eff = computed.eff_used_bytes or computed.used_bytes
+		local ainfo, adays, apcopy = api_prepare(active, vdata)
+		api = ainfo
+		if ainfo.active then
+			api.vnstat_used_bytes = vnstat_eff
+			computed = core.compute(adays, apcopy, today_str(), os.time())
+		end
 	end
 
 	local history = collect_history(uci)
@@ -417,6 +578,8 @@ function action_status()
 		end
 	end
 
+	health.source = (api and api.active) and "api" or "vnstat"
+
 	write_json({
 		ok = true,
 		version = installed_version(),
@@ -439,6 +602,7 @@ function action_status()
 		totals = totals,
 		can_undo = section_exists(uci, "lastclose"),
 		health = health,
+		api = api,
 	})
 end
 
@@ -476,7 +640,12 @@ function action_start()
 		return write_json({ ok = false, error = "Periode berjalan tidak punya hari untuk ditutup." }, 400)
 	end
 	local days = iface_days(vdata, active.iface)
-	local snap = core.snapshot(days, active, end_excl)
+	local snap_period = active
+	local ainfo, adays, apcopy = api_prepare(active, vdata)
+	if ainfo and ainfo.active then
+		days, snap_period = adays, apcopy
+	end
+	local snap = core.snapshot(days, snap_period, end_excl)
 
 	local sid = uci:section(CONFIG, "snapshot")
 	uci:set(CONFIG, sid, "start", snap.start)
@@ -523,6 +692,15 @@ function action_start()
 		direct_gb = tonumber(settings.direct_gb) or 0,
 		opening_blocks = opening, correction = 0, auto = "0",
 	})
+	-- Keadaan API periode lama disimpan untuk Urungkan; periode baru
+	-- menyemai keadaannya sendiri pada status berikutnya.
+	local api_path = api_state_path()
+	local st_raw = read_file(api_path)
+	if st_raw then
+		local f = io.open(api_path .. ".lastclose", "w")
+		if f then f:write(st_raw) f:close() end
+		os.remove(api_path)
+	end
 	uci:commit(CONFIG)
 	write_json({ ok = true, snapshot_id = sid })
 end
@@ -555,6 +733,17 @@ function action_undo()
 		if v ~= nil then uci:set(CONFIG, "active", k, v) end
 	end
 	delete_section(uci, "lastclose")
+	-- Pulihkan keadaan API periode yang diurungkan (bila ada);
+	-- tanpa cadangan, keadaan API periode prematur dibuang.
+	local api_path = api_state_path()
+	local lc_raw = read_file(api_path .. ".lastclose")
+	if lc_raw then
+		local f = io.open(api_path, "w")
+		if f then f:write(lc_raw) f:close() end
+		os.remove(api_path .. ".lastclose")
+	else
+		os.remove(api_path)
+	end
 	uci:commit(CONFIG)
 	write_json({ ok = true })
 end
@@ -614,6 +803,11 @@ function action_sync()
 	if remain_bytes > purchased_real then
 		return write_json({ ok = false,
 			error = "Sisa operator melebihi kuota terbeli — cek lagi angkanya." }, 400)
+	end
+	local api_st = load_json_file(api_state_path())
+	if api_st and api_st.period_start == active.start then
+		return write_json({ ok = false,
+			error = "Sumber API Sunset sedang aktif — angka sudah dari operator, sinkron manual tidak diperlukan." }, 400)
 	end
 	local vdata = vnstat_data()
 	local computed = core.compute(iface_days(vdata, active.iface),
@@ -714,6 +908,7 @@ function action_export()
 		settings = section_map(uci, "settings", SETTINGS_KEYS),
 		active = section_map(uci, "active", PERIOD_KEYS),
 		history = snaps,
+		api_state = load_json_file(api_state_path()),
 	}
 	luci.http.header("Content-Disposition",
 		'attachment; filename="boundless-kuota-backup.json"')
@@ -765,6 +960,14 @@ function action_import()
 			end
 		end
 	end
+	-- Keadaan API: pulihkan dari cadangan yang memuatnya; cadangan
+	-- lama (tanpa api_state) mengosongkannya agar tidak basi.
+	if type(data.api_state) == "table" then
+		save_json_file(api_state_path(), data.api_state)
+	else
+		os.remove(api_state_path())
+	end
+	os.remove(api_state_path() .. ".lastclose")
 	uci:commit(CONFIG)
 	write_json({ ok = true })
 end
@@ -785,6 +988,8 @@ function action_reset()
 	if section_exists(uci, "settings") then
 		uci:set(CONFIG, "settings", "initialized", "0")
 	end
+	os.remove(api_state_path())
+	os.remove(api_state_path() .. ".lastclose")
 	uci:commit(CONFIG)
 	return write_json({ ok = true })
 end

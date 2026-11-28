@@ -3,14 +3,32 @@
 App LuCI untuk memonitor kuota internet GSM (modem di STB OpenWrt)
 berdasarkan traffic asli yang lewat STB. Menu: **Services → Monitoring Kuota**.
 
-Beda dengan Sunset: Sunset menampilkan sisa paket menurut operator XL,
-app ini mengukur traffic sebenarnya dari **vnStat** yang sudah berjalan
-di firmware — app tidak punya database traffic sendiri dan tidak pernah
+Beda dengan Sunset: Sunset adalah panel transaksinya (OTP, beli paket),
+app ini panel monitoringnya. Sejak 0.3.0 sumber utama app ini adalah
+**angka resmi operator** dari backend Sunset; vnStat yang sudah berjalan
+di firmware menjadi pembanding + cadangan otomatis — app tidak pernah
 menulis ke database vnStat.
 
 ## Cara kerja
 
-- App membaca `vnstat --json` (harian) untuk interface sumber periode.
+- **Sumber API Sunset (utama, 0.3.0):** config dipinjam dari app Sunset
+  di STB yang sama (`uci sunset.settings`). Terpakai + sisa per paket
+  dari `GET /api/luci/welcome` dengan model baseline + beku: paket yang
+  kedaluwarsa/hilang dibekukan pada nilai terakhirnya, paket baru
+  baseline-nya 0, ganti nomor mempertahankan total sebagai offset.
+  Pembelian resmi XL (semua kanal, status SUCCESS) dari
+  `GET /api/luci/history` diakumulasi lokal (dedupe per transaksi) dan
+  ditampilkan sebagai bukti pembanding di kartu *Pembelian Tercatat* —
+  biaya utama tetap rumus skema. Cron snapshot tiap 30 menit
+  (`/usr/bin/boundlesskuota-snapshot`) menjaga kumulatif harian +
+  akumulasi riwayat walau dashboard tidak dibuka. Keadaan API disimpan
+  di `/etc/boundlesskuota-api.json` (ikut ekspor/impor cadangan).
+- **Cadangan vnStat:** API tak terjangkau → app jatuh ke pembacaan
+  `vnstat --json` (harian) untuk interface sumber periode, termasuk
+  model jangkar sinkron manual 0.2.x (sinkron manual ditolak selama
+  API aktif). Migrasi pertama ke API memakai terpakai efektif
+  akuntansi vnStat/jangkar sebagai offset + menyemai kumulatif harian
+  dari riwayat vnStat, jadi dashboard tidak meloncat.
 - **Periode** dimulai manual lewat tombol *Mulai Periode Baru* (pas beli
   dasar), tanggal mulai bisa dimundurkan; periode lama ditutup sebagai
   **snapshot permanen** di riwayat.

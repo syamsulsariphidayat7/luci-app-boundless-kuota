@@ -14,10 +14,17 @@ echo "[boundless-kuota] Menghapus file aplikasi..."
 rm -f /usr/lib/lua/luci/controller/boundlesskuota.lua
 rm -f /usr/lib/lua/luci/model/boundlesskuota_core.lua
 rm -rf /usr/lib/lua/luci/view/boundlesskuota
+rm -f /usr/bin/boundlesskuota-snapshot
+if [ -f /etc/crontabs/root ] && grep -q "boundlesskuota-snapshot" /etc/crontabs/root; then
+	sed -i "/boundlesskuota-snapshot/d" /etc/crontabs/root
+	if [ -x /etc/init.d/cron ]; then /etc/init.d/cron restart >/dev/null 2>&1 || true; fi
+	echo "[boundless-kuota] Cron snapshot API dihapus."
+fi
 
 if [ "$1" = "purge" ]; then
 	echo "[boundless-kuota] purge: config ikut dihapus."
 	rm -f /etc/config/boundlesskuota
+	rm -f /etc/boundlesskuota-api.json /etc/boundlesskuota-api.json.lastclose
 	rm -rf /root/luci-app-boundless-kuota
 	rm -f /root/luci-app-boundless-kuota-uninstall.sh
 else

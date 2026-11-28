@@ -14,8 +14,9 @@ CTL="usr/lib/lua/luci/controller/boundlesskuota.lua"
 CORE="usr/lib/lua/luci/model/boundlesskuota_core.lua"
 VIEW="usr/lib/lua/luci/view/boundlesskuota/dashboard.htm"
 CFG="etc/config/boundlesskuota"
+SNAP="usr/bin/boundlesskuota-snapshot.lua"
 
-for f in "$CTL" "$CORE" "$VIEW" "$CFG" "VERSION"; do
+for f in "$CTL" "$CORE" "$VIEW" "$CFG" "$SNAP" "VERSION"; do
 	if [ ! -f "$DIR/$f" ]; then
 		echo "[boundless-kuota] ERROR: file $f tidak ada di $DIR" >&2
 		exit 1
@@ -27,6 +28,7 @@ mkdir -p /usr/lib/lua/luci/controller /usr/lib/lua/luci/model /usr/lib/lua/luci/
 cp -f "$DIR/$CTL" "/$CTL"
 cp -f "$DIR/$CORE" "/$CORE"
 cp -f "$DIR/$VIEW" "/$VIEW"
+cp -f "$DIR/$SNAP" /usr/bin/boundlesskuota-snapshot
 cp -f "$DIR/VERSION" /usr/lib/lua/luci/view/boundlesskuota/VERSION
 if [ -f /etc/config/boundlesskuota ]; then
 	echo "[boundless-kuota] Config lama dipertahankan."
@@ -34,6 +36,21 @@ else
 	cp -f "$DIR/$CFG" /etc/config/boundlesskuota
 fi
 chmod 644 "/$CTL" "/$CORE" "/$VIEW" /usr/lib/lua/luci/view/boundlesskuota/VERSION /etc/config/boundlesskuota
+chmod 755 /usr/bin/boundlesskuota-snapshot
+
+# Cron snapshot API Sunset (tiap 30 menit): menjaga kumulatif
+# harian + akumulasi riwayat walau dashboard tidak dibuka.
+# Kegagalan di sini tidak menggagalkan pemasangan.
+if [ -d /etc/crontabs ]; then
+	touch /etc/crontabs/root
+	if grep -q "boundlesskuota-snapshot" /etc/crontabs/root; then
+		echo "[boundless-kuota] Cron snapshot API sudah terdaftar."
+	else
+		echo "*/30 * * * * /usr/bin/boundlesskuota-snapshot >/dev/null 2>&1" >> /etc/crontabs/root
+		if [ -x /etc/init.d/cron ]; then /etc/init.d/cron restart >/dev/null 2>&1 || true; fi
+		echo "[boundless-kuota] Cron snapshot API terdaftar (tiap 30 menit)."
+	fi
+fi
 
 # PnP: pastikan vnStat ikut mencatat interface modem wwan0 mulai
 # sekarang, supaya periode berikutnya bisa memakai data modem.
@@ -64,5 +81,6 @@ if [ -x /etc/init.d/uhttpd ]; then /etc/init.d/uhttpd restart; fi
 
 grep -q "luci.controller.boundlesskuota" "/$CTL" && echo "[boundless-kuota] controller OK"
 grep -q "boundlesskuota_core" "/$CORE" && echo "[boundless-kuota] core OK"
+[ -x /usr/bin/boundlesskuota-snapshot ] && echo "[boundless-kuota] snapshot cron OK"
 [ -f "/$VIEW" ] && echo "[boundless-kuota] view OK (versi $(cat /usr/lib/lua/luci/view/boundlesskuota/VERSION))"
 echo "[boundless-kuota] SELESAI. Buka LuCI -> Services -> Monitoring Kuota (hard refresh: Ctrl+F5)."
