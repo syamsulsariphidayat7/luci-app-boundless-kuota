@@ -115,7 +115,7 @@
 				<h2>Periode Berjalan</h2>
 				<div id="bkPeriodBody"><div class="hint">Memuat...</div></div>
 				<div id="bkUndoBox" style="display:none;margin-top:12px">
-					<div class="lock-note amber" style="margin-top:0">Periode baru saja dibuat. Tidak sengaja? Urungkan — periode sebelumnya aktif lagi, snapshot prematur dihapus.</div>
+					<div class="lock-note amber" style="margin-top:0">Periode baru saja dibuat. Tidak sengaja? Urungkan — periode sebelumnya aktif lagi.</div>
 					<button class="btn alt sm" id="bkUndoBtn" type="button" style="width:100%;margin-top:8px">Urungkan Periode Baru</button>
 				</div>
 				<div class="msg" id="bkPeriodMsg"></div>
@@ -153,7 +153,7 @@
 					<tbody id="bkHistoryBody"></tbody>
 				</table>
 				</div>
-				<div class="hint">Periode tertutup = snapshot permanen, lengkap dengan daftar pembeliannya (tap Rincian).</div>
+				<div class="hint">Periode tertutup tersimpan permanen + daftar pembeliannya (tap Rincian).</div>
 				<div class="corr">
 					<a class="btn alt sm" id="bkExportBtn" href="#">Ekspor Cadangan</a>
 					<button class="btn alt sm" id="bkImportToggle" type="button">Impor Cadangan</button>
@@ -187,7 +187,7 @@
 				<h2>Pengaturan</h2>
 				<label class="f">Masa aktif periode berikutnya (hari)</label>
 				<input class="f" id="bkSetDays" type="number" min="1" max="366">
-				<div class="hint">Harga dan kuota dibaca otomatis dari XL — tidak ada skema manual lagi. Koreksi harga per transaksi lewat tombol &#9998; di daftar Pembelian Tercatat.</div>
+				<div class="hint">Harga &amp; kuota otomatis dari XL. Koreksi harga per transaksi lewat tombol &#9998; di Pembelian Tercatat.</div>
 				<button class="btn" id="bkSetSave" type="button" style="width:100%;margin-top:12px">Simpan</button>
 				<div class="msg" id="bkSetMsg"></div>
 			</div>
@@ -206,7 +206,7 @@
 		</div>
 	</div>
 
-	<div class="foot" id="bkFoot">Data dari API Sunset (operator XL), diambil segar setiap halaman dibuka. Biaya = pembelian tercatat dengan harga riil.</div>
+	<div class="foot" id="bkFoot">Data API Sunset (XL), diambil segar tiap halaman dibuka. Biaya = pembelian tercatat, harga riil.</div>
 
 	<div class="modal-bg" id="bkModalBg">
 		<div class="modal" id="bkModal">
@@ -225,18 +225,6 @@
 		</div>
 	</div>
 
-	<div class="modal-bg" id="bkCorrBg">
-		<div class="modal" id="bkCorrModal">
-			<h3>Koreksi Terpakai</h3>
-			<div class="hint">Menyamakan total terpakai periode ini dengan hitungan pembelian: untuk tiap paket yang dibeli berulang, terpakai = (jumlah pembelian &times; isi paket) &minus; sisa sekarang. Ini memperbaiki akumulasi warisan model lama; selisih harian tidak berubah.</div>
-			<div id="bkCorrBody"><div class="hint">Menghitung...</div></div>
-			<div class="msg" id="bkCorrMsg"></div>
-			<div class="acts">
-				<button class="btn alt" id="bkCorrCancel" type="button">Batal</button>
-				<button class="btn" id="bkCorrApply" type="button">Terapkan Koreksi</button>
-			</div>
-		</div>
-	</div>
 </div>
 
 <script>
@@ -260,7 +248,7 @@ function gb(bytes, dec){
 function gbb(bytes){
 	var b = Number(bytes) || 0;
 	if (b > 0 && b < GB) return Math.round(b / 1048576).toLocaleString("id-ID") + " MB";
-	return gb(b, 1) + " GB";
+	return gb(b, 3) + " GB";
 }
 function fmtDate(iso){
 	if (!iso) return "-";
@@ -360,8 +348,8 @@ function render(){
 
 	// Banner peringatan
 	var banner = "";
-	if (a && !h.api_configured) banner = "App Sunset belum terkonfigurasi di STB ini (api_url / secret kosong) — belum ada data yang bisa dibaca.";
-	else if (a && h.api_stale) banner = "API Sunset tidak terjangkau — menampilkan data terakhir yang tersimpan. Pembelian dan pemakaian sesudahnya belum tercatat di sini.";
+	if (a && !h.api_configured) banner = "App Sunset belum terkonfigurasi di STB ini (api_url / secret kosong).";
+	else if (a && h.api_stale) banner = "API Sunset tidak terjangkau — menampilkan data terakhir yang tersimpan.";
 	else if (c && c.expired) banner = "Periode berakhir — menunggu periode baru. Beli dasar baru, lalu tap Mulai Periode Baru.";
 	el("bkBanner").textContent = banner;
 	el("bkBanner").className = "banner" + (banner ? " show" : "");
@@ -382,27 +370,27 @@ function render(){
 		var html = "";
 		html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">';
 		html += '<div class="big">' + rp(c.purchases_total) + ' <small>total biaya tercatat · ' + c.purchases_count + " pembelian</small></div>";
-		html += '<div class="cost-line"><span class="lbl">Terpakai</span><b>' + gb(c.used_bytes, 1) + ' GB</b>' +
+		html += '<div class="cost-line"><span class="lbl">Terpakai</span><b>' + gb(c.used_bytes, 3) + ' GB</b>' +
 			(c.price_per_gb > 0 ? '<span class="sub">harga efektif ' + rp(c.price_per_gb) + "/GB</span>" : "") + "</div></div>";
 		if (c.remaining_bytes != null) {
 			var denom = c.used_bytes + c.remaining_bytes;
 			var pct = denom > 0 ? Math.min(100, c.used_bytes / denom * 100) : 0;
 			html += '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
-			html += '<div class="hint" style="margin:0">Terpakai ' + gb(c.used_bytes, 1) + " GB dari \u00B1" + gb(denom, 1) + " GB yang tersedia (terpakai + sisa bucket aktif saat ini).</div>";
+			html += '<div class="hint" style="margin:0">Terpakai ' + gb(c.used_bytes, 3) + " GB dari \u00B1" + gb(denom, 3) + " GB yang tersedia (terpakai + sisa bucket aktif saat ini).</div>";
 		}
 		if (c.remaining_all_bytes != null && c.remaining_bytes != null && c.remaining_all_bytes !== c.remaining_bytes) {
-			html += '<div class="hint">Sisa semua paket: ' + gb(c.remaining_all_bytes, 1) + ' GB — termasuk kuota khusus (aplikasi/5G/bundling) yang tidak terpakai trafik ini; yang dihitung di atas hanya bucket yang aktif terpakai.</div>';
+			html += '<div class="hint">Sisa semua paket: ' + gb(c.remaining_all_bytes, 3) + ' GB — termasuk kuota khusus yang tidak terpakai; di atas hanya bucket aktif.</div>';
 		}
 		var left = c.days_total - c.day_number;
 		html += '<div class="hint">Hari ke-' + c.day_number + " dari " + c.days_total
 			+ (left >= 0 ? " · sisa " + left + " hari" : " · lewat " + (-left) + " hari")
 			+ " · mulai " + fmtDate(a.start) + " · berakhir " + fmtDate(c.expiry) + " 00:00</div>";
 		html += '<div class="meta">';
-		var remainTxt = c.remaining_bytes == null ? "&mdash;" : gb(c.remaining_bytes, 1) + " GB";
+		var remainTxt = c.remaining_bytes == null ? "&mdash;" : gb(c.remaining_bytes, 3) + " GB";
 		var remainCls = (c.remaining_bytes != null && c.remaining_bytes < 2 * GB) ? ' style="color:var(--amber)"' : "";
 		html += '<div><div class="k">Sisa (bucket aktif)</div><div class="v"' + remainCls + ">" + remainTxt + "</div></div>";
-		html += '<div><div class="k">Hari ini</div><div class="v">' + gb(c.today_bytes, 1) + " GB</div></div>";
-		html += '<div><div class="k">Terpakai</div><div class="v">' + gb(c.used_bytes, 1) + " GB</div></div>";
+		html += '<div><div class="k">Hari ini</div><div class="v">' + gb(c.today_bytes, 3) + " GB</div></div>";
+		html += '<div><div class="k">Terpakai</div><div class="v">' + gb(c.used_bytes, 3) + " GB</div></div>";
 		html += '<div><div class="k">Biaya</div><div class="v">' + rp(c.purchases_total) + "</div></div>";
 		html += "</div>";
 		var buckets = api.buckets || [];
@@ -416,18 +404,13 @@ function render(){
 			html += "</div>";
 		}
 		if (h.api_active) {
-			html += '<div class="lock-note">Sumber: API Sunset — nomor ' + esc(api.number || "-") + ". Biaya = pembelian resmi XL dengan harga riil; terpakai dan sisa bucket aktif = angka operator langsung.</div>";
+			html += '<div class="lock-note">Sumber: API Sunset · nomor ' + esc(api.number || "-") + ". Biaya = pembelian XL harga riil; terpakai &amp; sisa = angka operator.</div>";
 		} else if (h.api_stale) {
 			html += '<div class="lock-note amber">API Sunset tidak terjangkau — angka di halaman ini adalah data terakhir diambil ' + fmtDateTime(api.last_fetch) + " WIB.</div>";
 		} else if (!h.api_configured) {
 			html += '<div class="lock-note amber">Sunset belum terkonfigurasi di STB ini — pasang app Sunset dan isi api_url + secret-nya dulu.</div>';
 		}
-		if (h.api_active) {
-			html += '<div style="margin-top:12px"><button class="btn alt sm" id="bkCorrBtn" type="button">Koreksi Terpakai</button></div>';
-		}
 		body.innerHTML = html;
-		var corrBtn = body.querySelector("#bkCorrBtn");
-		if (corrBtn) corrBtn.onclick = openCorrection;
 	}
 
 	renderPurchases();
@@ -474,7 +457,7 @@ function renderPurchases(){
 	}
 	body.innerHTML = '<div style="overflow-x:auto"><table><thead><tr><th>Tanggal</th><th>Paket</th><th class="r">Harga</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
 		'<div class="kv" style="margin-top:8px"><span class="k">Total tercatat (' + (api.purchases_count || list.length) + ' pembelian)</span><span class="v">' + rp(api.purchases_total || 0) + "</span></div>" +
-		'<div class="hint">Dari riwayat transaksi resmi XL — semua kanal pembelian, hanya status SUCCESS; reload pulsa tidak dihitung (itu pendanaan, bukan pembelian). Harga = pengeluaran riil: kalau XL mencatat harga katalog tapi kamu membayar lain, tap &#9998; untuk mengoreksi (bertanda *). Total ini adalah biaya resmi periode berjalan; saat periode ditutup, daftar ini tersimpan permanen di Riwayat Periode.</div>';
+		'<div class="hint">Riwayat resmi XL, semua kanal, hanya status SUCCESS; reload pulsa tidak dihitung. Harga beda dari katalog? Tap &#9998; untuk koreksi (bertanda *).</div>';
 	var btns = body.querySelectorAll("[data-txkey]");
 	for (var j = 0; j < btns.length; j++) {
 		btns[j].onclick = function(){
@@ -510,15 +493,15 @@ function renderDaily(){
 		if (avgBytes > 0 && d.bytes > avgBytes) rowCls = (rowCls ? rowCls + " " : "") + "peak-row";
 		rows += "<tr" + (rowCls ? ' class="' + rowCls + '"' : "") + ">" +
 			"<td>" + fmtDate(d.date) + (isToday ? " (jalan)" : "") + "</td>" +
-			'<td class="r">' + gb(d.bytes, 2) + " GB</td>" +
-			'<td class="r">' + gb(d.cum_bytes, 2) + " GB</td>" +
+			'<td class="r">' + gb(d.bytes, 3) + " GB</td>" +
+			'<td class="r">' + gb(d.cum_bytes, 3) + " GB</td>" +
 			'<td class="r">' + rp(d.cost) + "</td>" +
 			'<td class="r">' + rp(d.cum_cost) + "</td>" +
 			'<td class="r">' + (d.price_per_gb > 0 ? rp(d.price_per_gb) + "/GB" : "&mdash;") + "</td></tr>";
 	}
 	tbody.innerHTML = rows;
 	el("bkChartHint").textContent = (dailyExpanded ? ("Menampilkan semua " + daily.length + " hari.") : "Menampilkan 7 hari terakhir.") +
-		(avgBytes > 0 ? " Baris kuning: pemakaian di atas rata-rata (" + gb(avgBytes, 2) + " GB/hari)." : "");
+		(avgBytes > 0 ? " Baris kuning: pemakaian di atas rata-rata (" + gb(avgBytes, 3) + " GB/hari)." : "");
 	var tg = el("bkDailyToggle");
 	tg.style.display = daily.length > 7 ? "" : "none";
 	tg.textContent = dailyExpanded ? "Tampilkan Ringkas" : ("Lihat Semua " + daily.length + " Hari");
@@ -531,7 +514,7 @@ function renderHistory(){
 	if (a && c) {
 		rows += '<tr><td>' + fmtDate(a.start) + ' &ndash; sekarang <span class="pill run">Berjalan</span></td>' +
 			'<td class="r">' + c.day_number + " / " + c.days_total + " hari</td>" +
-			'<td class="r">' + gb(c.used_bytes, 1) + " GB</td>" +
+			'<td class="r">' + gb(c.used_bytes, 3) + " GB</td>" +
 			'<td class="r">' + rp(c.purchases_total) + "</td></tr>";
 	}
 	var hist = state.history || [];
@@ -543,7 +526,7 @@ function renderHistory(){
 			(s.purchases_count ? '<div class="hint" style="margin:2px 0 0">' + s.purchases_count + " pembelian</div>" : "") +
 			(hasDetail ? ' <button class="btn alt sm" type="button" data-hist="' + esc(key) + '">Rincian</button>' : "") + "</td>" +
 			'<td class="r">' + s.duration_days + " hari</td>" +
-			'<td class="r">' + gb(s.used_bytes, 1) + " GB</td>" +
+			'<td class="r">' + gb(s.used_bytes, 3) + " GB</td>" +
 			'<td class="r">' + rp(s.paid) + "</td></tr>";
 		if (hasDetail) {
 			var items = "";
@@ -558,7 +541,7 @@ function renderHistory(){
 	var t = state.totals || { used_bytes: 0, paid: 0, duration_days: 0 };
 	rows += '<tr class="total-row"><td>Total Keseluruhan</td>' +
 		'<td class="r">' + t.duration_days + " hari</td>" +
-		'<td class="r">' + gb(t.used_bytes, 1) + " GB</td>" +
+		'<td class="r">' + gb(t.used_bytes, 3) + " GB</td>" +
 		'<td class="r">' + rp(t.paid) + "</td></tr>";
 	tbody.innerHTML = rows;
 	var btns = tbody.querySelectorAll("[data-hist]");
@@ -583,7 +566,7 @@ function renderSpend(){
 	var html = "";
 	html += '<div class="kv"><span class="k">Rata-rata belanja</span><span class="v">' + rp(avg) + "/hari</span></div>";
 	html += '<div class="kv"><span class="k">Perkiraan total akhir periode</span><span class="v">' + rp(est) + "</span></div>";
-	html += '<div class="hint">Perkiraan kasar dari laju belanja tercatat selama ' + c.day_number + " hari berjalan, untuk sisa " + remainDays + " hari. Pembelian add-on terjadi saat kuota habis, jadi angka akhir bisa berbeda.</div>";
+	html += '<div class="hint">Perkiraan dari laju belanja ' + c.day_number + " hari berjalan, untuk sisa " + remainDays + " hari. Angka akhir bisa berbeda — add-on dibeli saat kuota habis.</div>";
 	if (c.expired) html += '<div class="hint" style="color:var(--amber)">Periode sudah berakhir ' + fmtDate(c.expiry) + " 00:00.</div>";
 	body.innerHTML = html;
 }
@@ -603,9 +586,8 @@ function renderHealth(){
 	if (api.number) html += '<div class="kv"><span class="k">Nomor aktif</span><span class="v">' + esc(api.number) + "</span></div>";
 	html += '<div class="kv"><span class="k">Ambil terakhir</span><span class="v">' + fmtDateTime(api.last_fetch) + "</span></div>";
 	var cc = a ? a.computed : null;
-	if (cc && cc.remaining_all_bytes != null) html += '<div class="kv"><span class="k">Sisa semua paket</span><span class="v">' + gb(cc.remaining_all_bytes, 1) + " GB</span></div>";
-	if (api.correction) html += '<div class="kv"><span class="k">Koreksi terpakai</span><span class="v">' + (api.correction.delta_bytes >= 0 ? "+" : "-") + gb(Math.abs(api.correction.delta_bytes), 1) + " GB · " + fmtDateTime(api.correction.at) + "</span></div>";
-	html += '<div class="hint">Data diambil segar setiap halaman ini dibuka — tidak ada cache dan tidak ada snapshot latar. Hari tanpa kunjungan menyatu ke hari kunjungan berikutnya di tabel harian.</div>';
+	if (cc && cc.remaining_all_bytes != null) html += '<div class="kv"><span class="k">Sisa semua paket</span><span class="v">' + gb(cc.remaining_all_bytes, 3) + " GB</span></div>";
+	html += '<div class="hint">Data diambil segar tiap halaman dibuka, tanpa cache. Hari tanpa kunjungan menyatu ke kunjungan berikutnya di tabel harian.</div>';
 	body.innerHTML = html;
 }
 
@@ -634,7 +616,7 @@ el("bkStartBtn").onclick = function(){
 	if (a && c) {
 		el("bkModalIntro").textContent = "Periode berjalan akan ditutup sebagai snapshot permanen — daftar pembelian dan total biayanya tersimpan di Riwayat Periode.";
 		el("bkModalSummary").style.display = "block";
-		el("bkModalSummary").textContent = "Yang akan ditutup: periode " + fmtDate(a.start) + " – " + fmtDate(c.expiry) + " · terpakai " + gb(c.used_bytes, 1) + " GB · biaya tercatat " + rp(c.purchases_total) + " (" + c.purchases_count + " pembelian). Pastikan ini memang disengaja.";
+		el("bkModalSummary").textContent = "Yang akan ditutup: periode " + fmtDate(a.start) + " – " + fmtDate(c.expiry) + " · terpakai " + gb(c.used_bytes, 3) + " GB · biaya tercatat " + rp(c.purchases_total) + " (" + c.purchases_count + " pembelian). Pastikan ini memang disengaja.";
 	} else {
 		el("bkModalIntro").textContent = "Membuat periode pertama. Biaya tercatat dibaca dari riwayat XL sejak tanggal mulai yang dipilih.";
 		el("bkModalSummary").style.display = "none";
@@ -656,45 +638,6 @@ el("bkConfirmStart").onclick = function(){
 			msg("bkPeriodMsg", "Periode baru dimulai.", true);
 		} else {
 			msg("bkStartMsg", (d && d.error) || "Gagal memulai periode.", false);
-		}
-	});
-};
-function openCorrection(){
-	el("bkCorrBody").innerHTML = '<div class="hint">Menghitung dari data segar...</div>';
-	msg("bkCorrMsg", "", true);
-	el("bkCorrModal").style.background = themeSurface();
-	el("bkCorrBg").className = "modal-bg open";
-	el("bkCorrApply").disabled = true;
-	get("correctinfo", function(st, d){
-		if (!d || !d.ok) {
-			el("bkCorrBody").innerHTML = '<div class="hint">' + esc((d && d.error) || "Gagal menghitung koreksi.") + "</div>";
-			return;
-		}
-		var c = d.correction, rows = "";
-		for (var i = 0; i < c.rows.length; i++) {
-			var r = c.rows[i];
-			rows += '<div class="kv"><span class="k">' + esc(r.name) + '</span><span class="v">' + r.buys + " pembelian &times; " + gbb(r.total_bytes) + " &minus; sisa " + gbb(r.remaining_bytes) + " = " + gbb(r.target_bytes) + "</span></div>";
-		}
-		var delta = c.delta_bytes;
-		el("bkCorrBody").innerHTML = rows +
-			'<div class="kv"><span class="k">Terpakai tercatat sekarang</span><span class="v">' + gb(c.current_bytes, 1) + ' GB</span></div>' +
-			'<div class="kv"><span class="k">Target hitungan pembelian</span><span class="v">' + gb(c.target_bytes, 1) + ' GB</span></div>' +
-			'<div class="kv"><span class="k">Koreksi</span><span class="v">' + (delta === 0 ? "tidak ada selisih" : (delta > 0 ? "+" : "-") + gb(Math.abs(delta), 1) + " GB") + "</span></div>";
-		el("bkCorrApply").disabled = delta === 0;
-	});
-}
-el("bkCorrCancel").onclick = function(){ el("bkCorrBg").className = "modal-bg"; };
-el("bkCorrBg").onclick = function(e){ if (e.target === this) this.className = "modal-bg"; };
-el("bkCorrApply").onclick = function(){
-	el("bkCorrApply").disabled = true;
-	post("correct", {}, function(st, d){
-		if (d && d.ok) {
-			el("bkCorrBg").className = "modal-bg";
-			load();
-			msg("bkPeriodMsg", "Koreksi terpakai diterapkan.", true);
-		} else {
-			msg("bkCorrMsg", (d && d.error) || "Gagal menerapkan koreksi.", false);
-			el("bkCorrApply").disabled = false;
 		}
 	});
 };

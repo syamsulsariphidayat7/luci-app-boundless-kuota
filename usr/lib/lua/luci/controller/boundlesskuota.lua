@@ -40,10 +40,6 @@ function index()
 		post("action_txprice")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "settings"},
 		post("action_settings")).leaf = true
-	entry({"admin", "services", "boundlesskuota", "correctinfo"},
-		call("action_correctinfo")).leaf = true
-	entry({"admin", "services", "boundlesskuota", "correct"},
-		post("action_correct")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "export"},
 		call("action_export")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "import"},
@@ -437,7 +433,6 @@ function action_status()
 		api.purchases_total = purch.total
 		api.purchases_count = purch.count
 		api.buckets = st and core.bucket_list(st) or {}
-		api.correction = st and st.correction or nil
 		api.last_fetch = st and st.last_fetch or nil
 	end
 
@@ -474,55 +469,6 @@ function action_status()
 			expired = computed and computed.expired or false,
 		},
 		api = api,
-	})
-end
-
--- ---------- koreksi terpakai ----------
-
--- Persiapan bersama pratinjau + penerapan koreksi: ambil data
--- segar, hitung target dari pembelian tercatat. Mengembalikan
--- (active, st, corr) atau (nil, pesan galat).
-local function correction_prepare()
-	local uci = new_cursor()
-	local active = period_from_section(uci, "active")
-	if not active then return nil, "Tidak ada periode berjalan." end
-	local info, st, expiry = api_prepare(active)
-	if not st or not info.active then
-		return nil, "API Sunset tidak terjangkau; koreksi butuh data segar."
-	end
-	local today = today_str()
-	local end_excl = (today >= expiry) and expiry or core.add_days(today, 1)
-	local purch = core.api_purchases(st, active.start, end_excl)
-	local corr = core.correction_target(st, purch.list)
-	if not corr then
-		return nil, "Tidak ada pembelian yang cocok dengan bucket mana pun."
-	end
-	return active, st, corr
-end
-
-function action_correctinfo()
-	local _, b, corr = correction_prepare()
-	if not corr then return write_json({ ok = false, error = b }, 400) end
-	write_json({ ok = true, correction = corr })
-end
-
-function action_correct()
-	if not require_post() then return end
-	local _, b, corr = correction_prepare()
-	if not corr then return write_json({ ok = false, error = b }, 400) end
-	local st = b
-	if corr.delta_bytes ~= 0 then
-		core.apply_correction(st, corr.delta_bytes)
-		st.correction = {
-			delta_bytes = corr.delta_bytes,
-			target_bytes = corr.target_bytes,
-			at = os.time(),
-		}
-		save_json_file(api_state_path(), st)
-	end
-	write_json({
-		ok = true, correction = corr,
-		used_bytes = core.api_used(st),
 	})
 end
 

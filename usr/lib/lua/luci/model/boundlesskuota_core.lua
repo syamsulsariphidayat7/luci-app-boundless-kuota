@@ -237,7 +237,7 @@ function M.bucket_list(st)
 	return list
 end
 
--- ---------- koreksi terpakai satu kali ----------
+-- ---------- target hitungan pembelian ----------
 
 local function norm_name(s)
 	s = tostring(s or ""):lower():gsub("%s+", " ")
@@ -247,19 +247,16 @@ end
 -- Target terpakai menurut hitungan pembelian: untuk bucket yang
 -- punya pembelian tercatat di periode ini, total terpakainya =
 -- (jumlah pembelian x total bucket) - sisa sekarang. Itu eksak
--- untuk paket yang selalu dibeli saat habis, dan memperbaiki
--- akumulasi warisan model lama yang kehilangan sebagian
--- pemakaian bucket di era transisi. Bucket tanpa pembelian
--- mempertahankan akumulasinya apa adanya.
+-- untuk paket yang selalu dibeli saat habis. Bucket tanpa
+-- pembelian mempertahankan akumulasinya apa adanya.
 -- Judul transaksi dicocokkan ke nama bucket (sama persis atau
 -- saling mengandung setelah normalisasi); tiap transaksi hanya
 -- diklaim satu bucket (nama terpanjang didahulukan).
--- Target dihitung dari bucket SAJA (offset tidak ikut): delta
--- diterapkan ke offset, jadi offset ditulis ulang menjadi
--- target - total akumulasi bucket. Konsekuensinya pemakaian
--- dari paket yang sudah tidak ada di peta paket sama sekali
--- tidak ikut dalam target — pratinjau menampilkan target dan
--- selisihnya sebelum diterapkan.
+-- Target dihitung dari bucket SAJA (offset tidak ikut), lalu
+-- dibandingkan dengan total terpakai aktual (yang mencakup
+-- offset) oleh penanda isi ulang belum tercatat. Konsekuensinya
+-- pemakaian dari paket yang sudah tidak ada di peta paket sama
+-- sekali tidak ikut dalam target.
 -- Mengembalikan { target_bytes, current_bytes, delta_bytes,
 -- rows } atau nil bila tak ada pembelian yang cocok.
 function M.correction_target(st, purchases)
@@ -314,22 +311,9 @@ function M.correction_target(st, purchases)
 	}
 end
 
--- Terapkan koreksi: geser offset dan semua titik kumulatif
--- harian dengan delta yang sama — selisih harian tidak berubah,
--- kolom kumulatif naik rata.
-function M.apply_correction(st, delta)
-	delta = tonumber(delta) or 0
-	st.offset = (tonumber(st.offset) or 0) + delta
-	st.cum = st.cum or {}
-	for d, v in pairs(st.cum) do
-		st.cum[d] = (tonumber(v) or 0) + delta
-	end
-	return st
-end
-
 -- Selisih isi ulang yang belum tercatat (byte): pemakaian yang
 -- berasal dari isi ulang bucket yang pembeliannya BELUM muncul di
--- riwayat. Memakai hitungan koreksi yang sama — target adalah
+-- riwayat. Memakai hitungan target pembelian yang sama — target adalah
 -- pemakaian bila hanya pembelian tercatat yang mengisi bucket;
 -- kelebihan terpakai aktual di atas target adalah isi ulang yang
 -- belum tercatat. Ambang 1 GiB menyaring derau (penyesuaian kecil

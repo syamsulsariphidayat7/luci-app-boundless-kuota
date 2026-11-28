@@ -46,12 +46,6 @@ app ini buku catatannya. Sejak 0.4.0 satu-satunya sumber app ini adalah
 - **Satuan GB mengikuti operator**: 1 GB = 2^30 byte (biner,
   sama seperti MyXL/Sunset), supaya angka app identik dengan
   angka operator. Bucket di bawah 1 GB tampil dalam MB.
-- **Koreksi Terpakai** (tombol di kartu Periode): menyamakan
-  total terpakai dengan hitungan pembelian — per bucket yang
-  punya pembelian tercatat, terpakai = (jumlah pembelian × isi
-  bucket) − sisa sekarang. Untuk memperbaiki akumulasi warisan
-  model lama; pratinjau menampilkan target dan selisihnya
-  sebelum diterapkan, dan penerapannya tercatat di Status Data.
 - **Indikator memuat**: bar tipis beranimasi di atas halaman +
   tombol Muat Ulang berubah "Memuat..." dan nonaktif selama
   pengambilan data, supaya jelas data sedang diambil.
