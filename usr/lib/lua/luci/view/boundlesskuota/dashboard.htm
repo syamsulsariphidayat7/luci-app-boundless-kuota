@@ -618,11 +618,22 @@ function renderPurchases(){
 		var tx = list[i];
 		var dt = tx.timestamp ? new Date(tx.timestamp * 1000) : null;
 		var dstr = dt ? (dt.getDate() + " " + (MONTHS[dt.getMonth()] || "") + " " + dt.getFullYear()) : "-";
-		rows += "<tr><td>" + dstr + "</td><td>" + esc(tx.title || "-") + '</td><td class="r">' + (tx.price != null ? rp(tx.price) : "-") + "</td></tr>";
+		rows += "<tr><td>" + dstr + "</td><td>" + esc(tx.title || "-") + '</td><td class="r">' + (tx.price != null ? rp(tx.price) : "-") + (tx.overridden ? ' <span class="sub" title="Harga katalog XL: ' + rp(tx.price_orig || 0) + '">*</span>' : "") + ' <button class="btn alt sm" type="button" data-txkey="' + esc(tx.key || "") + '" data-txprice="' + (tx.price || 0) + '">&#9998;</button>' + "</td></tr>";
 	}
 	body.innerHTML = '<div style="overflow-x:auto"><table><thead><tr><th>Tanggal</th><th>Paket</th><th class="r">Harga</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
 		'<div class="kv" style="margin-top:8px"><span class="k">Total tercatat (' + (api.purchases_count || list.length) + ' pembelian)</span><span class="v">' + rp(api.purchases_total || 0) + "</span></div>" +
-		'<div class="hint">Dari riwayat transaksi resmi XL — semua kanal pembelian, hanya status SUCCESS. Bukti pembanding; biaya utama tetap rumus skema.</div>';
+		'<div class="hint">Dari riwayat transaksi resmi XL — semua kanal pembelian, hanya status SUCCESS; reload pulsa tidak dihitung (itu pendanaan, bukan pembelian). Harga = pengeluaran riil: kalau XL mencatat harga katalog tapi kamu membayar lain, tap &#9998; untuk mengoreksi (bertanda *). Bukti pembanding; biaya utama tetap rumus skema.</div>';
+	var btns = body.querySelectorAll("[data-txkey]");
+	for (var j = 0; j < btns.length; j++) {
+		btns[j].onclick = function(){
+			var v = prompt("Harga riil yang kamu bayar untuk transaksi ini (Rp). Kosongkan untuk kembali ke harga XL:", this.getAttribute("data-txprice"));
+			if (v === null) return;
+			post("txprice", { key: this.getAttribute("data-txkey"), price: v }, function(st2, d){
+				if (d && d.ok) load();
+				else alert((d && d.error) || "Gagal menyimpan koreksi harga.");
+			});
+		};
+	}
 }
 
 function renderHealth(){

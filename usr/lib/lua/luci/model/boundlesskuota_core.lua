@@ -548,15 +548,38 @@ function M.api_merge_tx(st, fetched)
 	return added
 end
 
--- Pembelian SUCCESS di dalam jendela tanggal [start, end_excl).
+-- Transaksi paket (bukan isi pulsa): reload/pulsa adalah pendanaan
+-- untuk membeli paket, bukan pembelian itu sendiri — menghitungnya
+-- juga akan menggandakan biaya yang sama.
+local function tx_is_package(tx)
+	local t = (tx.title or ""):lower()
+	if t:find("reload", 1, true) then return false end
+	if t:find("pulsa", 1, true) then return false end
+	return true
+end
+
+-- Pembelian paket SUCCESS di dalam jendela tanggal [start, end_excl).
+-- Harga yang tampil = harga riil: koreksi manual pengguna
+-- (st.price_overrides, per kunci transaksi) menimpa harga katalog
+-- yang dicatat XL, supaya totalnya = pengeluaran sebenarnya.
 function M.api_purchases(st, start_date, end_excl)
 	local list, total = {}, 0
-	for _, tx in pairs(st.txs or {}) do
-		if M.tx_is_success(tx) and tx.timestamp then
+	local overrides = st.price_overrides or {}
+	for k, tx in pairs(st.txs or {}) do
+		if M.tx_is_success(tx) and tx_is_package(tx) and tx.timestamp then
 			local d = M.epoch_date(tx.timestamp)
 			if d >= start_date and d < end_excl then
-				list[#list + 1] = tx
-				total = total + (tonumber(tx.price) or 0)
+				local item = {}
+				for kk, vv in pairs(tx) do item[kk] = vv end
+				item.key = k
+				local ov = tonumber(overrides[k])
+				if ov ~= nil then
+					item.price_orig = tonumber(tx.price)
+					item.price = ov
+					item.overridden = true
+				end
+				list[#list + 1] = item
+				total = total + (tonumber(item.price) or 0)
 			end
 		end
 	end

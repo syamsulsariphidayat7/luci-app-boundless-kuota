@@ -37,6 +37,8 @@ function index()
 		post("action_correct")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "sync"},
 		post("action_sync")).leaf = true
+	entry({"admin", "services", "boundlesskuota", "txprice"},
+		post("action_txprice")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "settings"},
 		post("action_settings")).leaf = true
 	entry({"admin", "services", "boundlesskuota", "setup"},
@@ -817,6 +819,34 @@ function action_sync()
 	uci:set(CONFIG, "active", "anchor_blocks", fmt_num(blocks_real))
 	uci:set(CONFIG, "active", "anchor_date", today_str())
 	uci:commit(CONFIG)
+	return write_json({ ok = true })
+end
+
+-- Koreksi harga riil satu transaksi tercatat (0.3.2): riwayat XL
+-- mencatat harga katalog, sedangkan pengguna bisa membayar lain
+-- (mis. Xtra Combo Plus katalog Rp35.000 dibayar Rp30.000).
+-- Override disimpan di keadaan API per kunci transaksi; price
+-- kosong menghapus override. Total Pembelian Tercatat sesudahnya
+-- = pengeluaran sebenarnya.
+function action_txprice()
+	if not require_post() then return end
+	local key = luci.http.formvalue("key")
+	local price_txt = luci.http.formvalue("price")
+	local st = load_json_file(api_state_path())
+	if not st or not key or type(st.txs) ~= "table" or st.txs[key] == nil then
+		return write_json({ ok = false, error = "Transaksi tidak ditemukan." }, 400)
+	end
+	st.price_overrides = type(st.price_overrides) == "table" and st.price_overrides or {}
+	if price_txt == nil or price_txt == "" then
+		st.price_overrides[key] = nil
+	else
+		local p = tonumber(price_txt)
+		if not p or p < 0 or p > 100000000 or p ~= math.floor(p) then
+			return write_json({ ok = false, error = "Harga tidak sah." }, 400)
+		end
+		st.price_overrides[key] = p
+	end
+	save_json_file(api_state_path(), st)
 	return write_json({ ok = true })
 end
 
