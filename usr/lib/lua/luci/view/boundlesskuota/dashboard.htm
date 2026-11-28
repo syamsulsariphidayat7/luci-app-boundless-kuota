@@ -47,6 +47,7 @@
 .bk-wrap .bigrow{display:flex;gap:12px 34px;flex-wrap:wrap;align-items:baseline}
 .bk-wrap .bigsep{width:1px;height:36px;background:currentColor;opacity:.25;align-self:center}
 .bk-wrap .big small{font-size:14px;font-weight:600;opacity:.7}
+.bk-wrap .big.est{color:#f59e0b}
 .bk-wrap .cost-line{font-size:14px;text-align:right}
 .bk-wrap .cost-line .lbl{opacity:.65}
 .bk-wrap .cost-line b{display:block;font-size:19px}
@@ -383,7 +384,7 @@ function render(){
 		var html = "";
 		html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">';
 		html += '<div class="bigrow"><div class="big">' + rp(c.purchases_total) + ' <small>tercatat · ' + c.purchases_count + " pembelian</small></div>"
-			+ (c.unrecorded_est_cost > 0 ? '<div class="bigsep"></div><div class="big">' + rp(c.purchases_total + c.unrecorded_est_cost) + ' <small>perkiraan total · ' + (c.purchases_count + c.unrecorded_est_buckets) + " pembelian (tertunda +" + rp(c.unrecorded_est_unit) + " \u00D7 " + c.unrecorded_est_buckets + ")</small></div>" : "")
+			+ (c.unrecorded_est_cost > 0 ? '<div class="bigsep"></div><div class="big est">' + rp(c.purchases_total + c.unrecorded_est_cost) + ' <small>perkiraan total · ' + (c.purchases_count + c.unrecorded_est_buckets) + " pembelian (tertunda +" + rp(c.unrecorded_est_unit) + " \u00D7 " + c.unrecorded_est_buckets + ")</small></div>" : "")
 			+ "</div>";
 		html += '<div class="cost-line"><span class="lbl">Terpakai</span><b>' + gb(c.used_bytes, 3) + ' GB</b>' +
 			(c.price_per_gb > 0 ? '<span class="sub">harga efektif ' + rp(c.price_per_gb) + "/GB</span>" : "") + "</div></div>";
