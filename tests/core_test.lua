@@ -182,5 +182,21 @@ eq(corr3.rows[1].buys, 1, "koreksi: judul ternormalisasi (huruf/spasi) tetap coc
 eq(core.correction_target(stk, { { title = "Paket Lain Sekali" } }), nil,
 	"koreksi: tidak ada pembelian cocok -> nil")
 
+-- ===== Selisih isi ulang belum tercatat (0.4.7) =====
+-- Replika kasus live: akumulasi 91 GB dari 10 isi (sisa 9 GB),
+-- tapi riwayat baru mencatat 9 pembelian -> selisih tepat 10 GB.
+local stg = { offset = 0, bmap = {}, cum = {}, txs = {} }
+stg.bmap["Bonus Kuota Instagram 10GB|999"] = { total = 10 * GB, last_used = 1 * GB, acc = 91 * GB, frozen = false }
+near(core.unrecorded_gap(stg, purch9) / GB, 10, 0.001, "gap: 10 isi vs 9 tercatat -> 10 GB")
+local purch10 = {}
+for i = 1, 10 do purch10[i] = { title = "Bonus Kuota Instagram 10GB" } end
+eq(core.unrecorded_gap(stg, purch10), 0, "gap: 10 isi vs 10 tercatat -> 0")
+-- Selisih 0,5 GB di bawah ambang 1 GiB -> 0 (derau, bukan isi ulang).
+local stg2 = { offset = 0, bmap = {}, cum = {}, txs = {} }
+stg2.bmap["Bonus Kuota Instagram 10GB|999"] = { total = 10 * GB, last_used = 1 * GB, acc = 81 * GB + GB / 2, frozen = false }
+eq(core.unrecorded_gap(stg2, purch9), 0, "gap: selisih 0,5 GB di bawah ambang -> 0")
+eq(core.unrecorded_gap(stg, { { title = "Paket Lain Sekali" } }), 0,
+	"gap: tanpa pembelian cocok -> 0")
+
 print(string.format("HASIL: %d lulus, %d gagal", pass, fail))
 TEST_FAIL = fail

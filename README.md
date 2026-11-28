@@ -55,6 +55,12 @@ app ini buku catatannya. Sejak 0.4.0 satu-satunya sumber app ini adalah
 - **Indikator memuat**: bar tipis beranimasi di atas halaman +
   tombol Muat Ulang berubah "Memuat..." dan nonaktif selama
   pengambilan data, supaya jelas data sedang diambil.
+- **Penanda isi ulang belum tercatat**: banner kuning muncul
+  sendiri bila terpakai mencakup isi ulang bucket yang
+  pembeliannya belum muncul di riwayat XL (selisih dari hitungan
+  pembelian ≥ 1 GiB) — total biaya saat itu belum termasuk
+  pembelian tersebut; banner hilang sendiri begitu transaksinya
+  tercatat.
 - **Periode** dimulai manual lewat tombol *Mulai Periode Baru* (pas
   beli dasar), tanggal mulai bisa dimundurkan; periode lama ditutup
   sebagai **snapshot permanen** di riwayat — lengkap dengan daftar

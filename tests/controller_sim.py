@@ -263,6 +263,8 @@ check(s["api"]["purchases_count"] == 4, "api: 4 pembelian SUCCESS paket (Reload+
 check(s["api"]["purchases_total"] == 44000, "api: total tercatat Rp44.000",
       str(s["api"].get("purchases_total")))
 check(c["purchases_total"] == 44000, "api: headline biaya = tercatat")
+check(isinstance(c.get("unrecorded_bytes"), (int, float)) and c["unrecorded_bytes"] >= 0,
+      "api: field unrecorded_bytes ada dan >= 0", str(c.get("unrecorded_bytes")))
 check(c["day_number"] == 2, "api: hari ke-2", str(c["day_number"]))
 
 # 4) Override harga riil XCP 35.000 -> 30.000.

@@ -327,6 +327,23 @@ function M.apply_correction(st, delta)
 	return st
 end
 
+-- Selisih isi ulang yang belum tercatat (byte): pemakaian yang
+-- berasal dari isi ulang bucket yang pembeliannya BELUM muncul di
+-- riwayat. Memakai hitungan koreksi yang sama — target adalah
+-- pemakaian bila hanya pembelian tercatat yang mengisi bucket;
+-- kelebihan terpakai aktual di atas target adalah isi ulang yang
+-- belum tercatat. Ambang 1 GiB menyaring derau (penyesuaian kecil
+-- operator, bucket harian kecil yang reset sendiri). Mengembalikan
+-- 0 bila selisihnya di bawah ambang atau tidak bisa dinilai (tak
+-- ada pembelian yang cocok dengan bucket mana pun).
+function M.unrecorded_gap(st, purchases)
+	local t = M.correction_target(st, purchases)
+	if not t then return 0 end
+	local gap = t.current_bytes - t.target_bytes
+	if gap < M.GB then return 0 end
+	return gap
+end
+
 -- Ganti nomor aktif: total terpakai dipertahankan sebagai offset
 -- baru, peta paket disemai ulang dari daftar live nomor baru.
 function M.api_reseed(st, live)

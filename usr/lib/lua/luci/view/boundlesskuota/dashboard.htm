@@ -37,6 +37,7 @@
 .bk-wrap .btn:disabled{opacity:.5;cursor:default}
 .bk-wrap .banner{display:none;border:1px solid rgba(217,119,6,.55);background:rgba(251,191,36,.13);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:12px 0}
 .bk-wrap .banner.show{display:block}
+.bk-wrap .banner.gap{background:rgba(245,158,11,.5);border:1px solid #b45309;font-weight:600}
 .bk-wrap .grid{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
 @media(max-width:900px){.bk-wrap .grid{grid-template-columns:1fr}}
 .bk-wrap .card{background:rgba(127,127,127,.06);border:1px solid rgba(127,127,127,.25);border-radius:14px;padding:18px;margin-bottom:16px}
@@ -106,6 +107,7 @@
 	</div>
 
 	<div class="banner" id="bkBanner"></div>
+	<div class="banner" id="bkGapBanner"></div>
 
 	<div class="grid">
 		<div>
@@ -363,6 +365,14 @@ function render(){
 	else if (c && c.expired) banner = "Periode berakhir — menunggu periode baru. Beli dasar baru, lalu tap Mulai Periode Baru.";
 	el("bkBanner").textContent = banner;
 	el("bkBanner").className = "banner" + (banner ? " show" : "");
+
+	// Penanda isi ulang yang pembeliannya belum tercatat di riwayat
+	var gapBytes = (c && c.unrecorded_bytes) || 0;
+	var gapTxt = gapBytes > 0
+		? ("Ada isi ulang ±" + gb(gapBytes, 1) + " GB yang pembeliannya belum tercatat — total biaya belum termasuk pembelian ini.")
+		: "";
+	el("bkGapBanner").textContent = gapTxt;
+	el("bkGapBanner").className = "banner gap" + (gapTxt ? " show" : "");
 
 	// Periode berjalan
 	var body = el("bkPeriodBody");

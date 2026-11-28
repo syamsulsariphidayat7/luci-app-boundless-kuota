@@ -431,6 +431,7 @@ function action_status()
 			purchases_total = purch.total,
 			purchases_count = purch.count,
 			price_per_gb = used > 0 and (purch.total / (used / core.GB)) or 0,
+			unrecorded_bytes = st and core.unrecorded_gap(st, purch.list) or 0,
 		}
 		api.purchases = purch.list
 		api.purchases_total = purch.total
