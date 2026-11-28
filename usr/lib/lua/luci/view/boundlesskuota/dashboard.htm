@@ -468,7 +468,8 @@ function renderPurchases(){
 	for (var i = 0; i < list.length; i++) {
 		var tx = list[i];
 		var dt = tx.timestamp ? new Date(tx.timestamp * 1000) : null;
-		var dstr = dt ? (dt.getDate() + " " + (MONTHS[dt.getMonth()] || "") + " " + dt.getFullYear()) : "-";
+		var dstr = dt ? (dt.getDate() + " " + (MONTHS[dt.getMonth()] || "") + " " + dt.getFullYear() +
+			" · " + ("0" + dt.getHours()).slice(-2) + ":" + ("0" + dt.getMinutes()).slice(-2)) : "-";
 		rows += "<tr><td>" + dstr + "</td><td>" + esc(tx.title || "-") + '</td><td class="r">' + (tx.price != null ? rp(tx.price) : "-") + (tx.overridden ? ' <span title="Harga katalog XL: ' + rp(tx.price_orig || 0) + '">*</span>' : "") + ' <button class="btn alt sm" type="button" data-txkey="' + esc(tx.key || "") + '" data-txprice="' + (tx.price || 0) + '">&#9998;</button>' + "</td></tr>";
 	}
 	body.innerHTML = '<div style="overflow-x:auto"><table><thead><tr><th>Tanggal</th><th>Paket</th><th class="r">Harga</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
