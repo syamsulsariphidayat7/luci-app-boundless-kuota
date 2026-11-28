@@ -256,6 +256,17 @@ function fmtDate(iso){
 	if (p.length !== 3) return iso;
 	return Number(p[2]) + " " + (MONTHS[Number(p[1]) - 1] || "") + " " + p[0];
 }
+function prevDayIso(iso){
+	if (!iso) return null;
+	var p = String(iso).split("-");
+	if (p.length !== 3) return null;
+	var d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])) - 86400000);
+	return d.getUTCFullYear() + "-" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "-" + ("0" + d.getUTCDate()).slice(-2);
+}
+function fmtExpiry(iso){
+	var prev = prevDayIso(iso);
+	return prev ? fmtDate(prev) + " 23:59" : "-";
+}
 function fmtDateTime(epoch){
 	if (!epoch) return "-";
 	var d = new Date(epoch * 1000);
@@ -384,7 +395,7 @@ function render(){
 		var left = c.days_total - c.day_number;
 		html += '<div class="hint">Hari ke-' + c.day_number + " dari " + c.days_total
 			+ (left >= 0 ? " · sisa " + left + " hari" : " · lewat " + (-left) + " hari")
-			+ " · mulai " + fmtDate(a.start) + " · berakhir " + fmtDateTime(c.expiry - 1) + "</div>";
+			+ " · mulai " + fmtDate(a.start) + " · berakhir " + fmtExpiry(c.expiry) + "</div>";
 		html += '<div class="meta">';
 		var remainTxt = c.remaining_bytes == null ? "&mdash;" : gb(c.remaining_bytes, 3) + " GB";
 		var remainCls = (c.remaining_bytes != null && c.remaining_bytes < 2 * GB) ? ' style="color:var(--amber)"' : "";
@@ -522,7 +533,7 @@ function renderHistory(){
 		var s = hist[i];
 		var key = s.id || ("h" + i);
 		var hasDetail = s.purchases && s.purchases.length;
-		rows += "<tr><td>" + fmtDate(s.start) + " &ndash; " + fmtDate(s.end_date - 1) + ' <span class="pill done">Selesai</span>' +
+		rows += "<tr><td>" + fmtDate(s.start) + " &ndash; " + fmtDate(prevDayIso(s.end_date)) + ' <span class="pill done">Selesai</span>' +
 			(s.purchases_count ? '<div class="hint" style="margin:2px 0 0">' + s.purchases_count + " pembelian</div>" : "") +
 			(hasDetail ? ' <button class="btn alt sm" type="button" data-hist="' + esc(key) + '">Rincian</button>' : "") + "</td>" +
 			'<td class="r">' + s.duration_days + " hari</td>" +
@@ -567,7 +578,7 @@ function renderSpend(){
 	html += '<div class="kv"><span class="k">Rata-rata belanja</span><span class="v">' + rp(avg) + "/hari</span></div>";
 	html += '<div class="kv"><span class="k">Perkiraan total akhir periode</span><span class="v">' + rp(est) + "</span></div>";
 	html += '<div class="hint">Perkiraan dari laju belanja ' + c.day_number + " hari berjalan, untuk sisa " + remainDays + " hari. Angka akhir bisa berbeda — add-on dibeli saat kuota habis.</div>";
-	if (c.expired) html += '<div class="hint" style="color:var(--amber)">Periode sudah berakhir ' + fmtDateTime(c.expiry - 1) + ".</div>";
+	if (c.expired) html += '<div class="hint" style="color:var(--amber)">Periode sudah berakhir ' + fmtExpiry(c.expiry) + ".</div>";
 	body.innerHTML = html;
 }
 
@@ -616,7 +627,7 @@ el("bkStartBtn").onclick = function(){
 	if (a && c) {
 		el("bkModalIntro").textContent = "Periode berjalan akan ditutup sebagai snapshot permanen — daftar pembelian dan total biayanya tersimpan di Riwayat Periode.";
 		el("bkModalSummary").style.display = "block";
-		el("bkModalSummary").textContent = "Yang akan ditutup: periode " + fmtDate(a.start) + " – " + fmtDate(c.expiry - 1) + " · terpakai " + gb(c.used_bytes, 3) + " GB · biaya tercatat " + rp(c.purchases_total) + " (" + c.purchases_count + " pembelian). Pastikan ini memang disengaja.";
+		el("bkModalSummary").textContent = "Yang akan ditutup: periode " + fmtDate(a.start) + " – " + fmtDate(prevDayIso(c.expiry)) + " · terpakai " + gb(c.used_bytes, 3) + " GB · biaya tercatat " + rp(c.purchases_total) + " (" + c.purchases_count + " pembelian). Pastikan ini memang disengaja.";
 	} else {
 		el("bkModalIntro").textContent = "Membuat periode pertama. Biaya tercatat dibaca dari riwayat XL sejak tanggal mulai yang dipilih.";
 		el("bkModalSummary").style.display = "none";
